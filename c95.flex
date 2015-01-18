@@ -153,5 +153,6 @@ int check_type()
 }
 
 main(int argc,char **argv){
-	while(yylex());
+int t;
+	while(t = yylex())printf("[%d]\n",t);
 }
