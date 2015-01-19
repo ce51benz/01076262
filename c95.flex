@@ -23,7 +23,7 @@ void comment(void);
 
 %%
 "/*"			{ comment(); }
-
+[#]                     { dopreproc();}  
 "auto"			{ return(AUTO); }
 "break"			{ return(BREAK); }
 "case"			{ return(CASE); }
@@ -122,7 +122,10 @@ L?\"(\\.|[^\\"])*\"	{ return(STRING_LITERAL); }
 
 %%
 
-
+void dopreproc()
+{
+while(input() != '\n');
+}
 
 comment()
 {
@@ -154,5 +157,12 @@ int check_type()
 
 main(int argc,char **argv){
 int t;
-	while(t = yylex())printf("[%d]\n",t);
+	while(t = yylex()){
+		printf("[%d",t);
+	if(t == IDENTIFIER)
+		printf(", %s]\n",yytext);
+	else if(t == CONSTANT)
+		printf(", %d]\n",atoi(yytext));
+	else printf("]\n");
+	}
 }
