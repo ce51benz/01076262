@@ -19,6 +19,7 @@ enum {CHAR=800, SHORT, INT, LONG, SIGNED, UNSIGNED, FLOAT, DOUBLE, CONST, VOLATI
 enum {CASE=900, DEFAULT, IF, ELSE, SWITCH, WHILE, DO, FOR, GOTO, CONTINUE, BREAK, RETURN};
 
 void comment(void);
+void dopreproc();
 %}
 
 %%
@@ -127,7 +128,7 @@ void dopreproc()
 while(input() != '\n');
 }
 
-comment()
+void comment()
 {
 	char c,c1;
 	while(1){
@@ -156,12 +157,12 @@ int check_type()
 }
 
 main(int argc,char **argv){
-int t;
-	while(t = yylex()){
-		printf("[%d",t);
-	if(t == IDENTIFIER)
+int tokenNumber;
+	while(tokenNumber = yylex()){
+		printf("[%d",tokenNumber);
+	if(tokenNumber == IDENTIFIER)
 		printf(", %s]\n",yytext);
-	else if(t == CONSTANT)
+	else if(tokenNumber == CONSTANT)
 		printf(", %d]\n",atoi(yytext));
 	else printf("]\n");
 	}
