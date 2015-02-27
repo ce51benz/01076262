@@ -1,0 +1,14 @@
+all:infix.tab.o lex.yy.o
+	gcc infix.tab.o lex.yy.o -o bisonrun
+infix.tab.o:infix.tab.c
+	gcc -c infix.tab.c
+lex.yy.o:infix.tab.h lex.yy.c
+	gcc -c lex.yy.c
+infix.tab.c:infix.y
+	bison infix.y
+infix.tab.h:infix.y
+	bison -d infix.y
+lex.yy.c:infixflex.flex
+	flex infixflex.flex
+clean:
+	rm lex.yy.c infix.tab.c infix.tab.o infix.tab.h lex.yy.o bisonrun
