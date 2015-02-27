@@ -1,17 +1,15 @@
 %{
   #include <stdio.h>
   void yyerror (char const *);
-  double powint(int,int);
+  double powlong(long,long);
 %}
 
 /* Bison declarations.  */
 /*%define api.value.type{double}*/
 %union{
-int intval;
+long intval;
 double val;
 }
-%token AND 100
-%token OR 101
 %token NOT 102
 %token NUMBIN 200
 %token <intval> NUMDEC 201
@@ -21,9 +19,11 @@ double val;
 %token SHOW 302
 %token COPY 303
 %token TO 400
+%left OR 101
+%left AND 100
 %left '-' '+'
 %left '*' '/' '\\'
-%precedence NEG   /* negation--unary minus */
+%precedence NEG NOT   /* negation--unary minus */
 %right '^'        /* exponentiation */
 
 %type <val> exp
@@ -42,21 +42,24 @@ line:
 
 exp:
   NUMDEC             { $$ = $1;	        }
+| exp AND exp	     { $$ = (long long)$1 & (long long)$3;    }
+| exp OR exp	     { $$ = (long long)$1 | (long long)$3;    }
+| NOT exp            { $$ = ~(long long)$2;}
 | exp '+' exp        { $$ = $1 + $3;      }
 | exp '-' exp        { $$ = $1 - $3;      }
 | exp '*' exp        { $$ = $1 * $3;      }
 | exp '/' exp        { $$ = $1 / $3;      }
-| exp '\\' exp	     { $$ = (int)$1 % (int)$3;	  }
+| exp '\\' exp	     { $$ = (long)$1 % (long)$3;	  }
 | '-' exp  %prec NEG { $$ = -$2;          }
-| exp '^' exp        { $$ = powint($1,$3);}
+| exp '^' exp        { $$ = powlong($1,$3);}
 | '(' exp ')'        { $$ = $2;           }
 | '[' exp ']'	     { $$ = $2;		  }
 | '{' exp '}'	     { $$ = $2;		  }
 ;
 
 %%
-double powint(int base,int pownum){
-int i;
+double powlong(long base,long pownum){
+long i;
 double sum = 1;
 for(i = 1;i<=pownum;i++)
 	sum = sum * base;
