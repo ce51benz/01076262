@@ -1,8 +1,7 @@
 %{
   #include <stdio.h>
   void yyerror (char const *);
-  double powint(int,int); 
-  double inttodouble(int);
+  double powint(int,int);
 %}
 
 /* Bison declarations.  */
@@ -42,15 +41,17 @@ line:
 ;
 
 exp:
-  NUMDEC             { $$ = $1;printf("%d $1 = %d $$ = %f\n",NUMDEC,$1,$$);	        }
+  NUMDEC             { $$ = $1;	        }
 | exp '+' exp        { $$ = $1 + $3;      }
 | exp '-' exp        { $$ = $1 - $3;      }
 | exp '*' exp        { $$ = $1 * $3;      }
 | exp '/' exp        { $$ = $1 / $3;      }
 | exp '\\' exp	     { $$ = (int)$1 % (int)$3;	  }
 | '-' exp  %prec NEG { $$ = -$2;          }
-| exp '^' exp        { $$ = powint ($1, $3); }
+| exp '^' exp        { $$ = powint($1,$3);}
 | '(' exp ')'        { $$ = $2;           }
+| '[' exp ']'	     { $$ = $2;		  }
+| '{' exp '}'	     { $$ = $2;		  }
 ;
 
 %%
@@ -59,11 +60,9 @@ int i;
 double sum = 1;
 for(i = 1;i<=pownum;i++)
 	sum = sum * base;
+return sum;
 }
 
-double inttodouble(int x){
-	return (double)x;
-}
 void yyerror(char const *str){
 printf("BENZ ERROR:%s\n",str);
 }
