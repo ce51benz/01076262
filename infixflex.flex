@@ -26,7 +26,7 @@
 "COPY"	{return COPY;}
 "TO"	{return TO;}
 [01]+b	{return NUMBIN;}
-[0-9]+	{yylval.intval = atol(yytext);return NUMDEC;}
+[0-9]+	{yylval = atol(yytext);return NUMDEC;}
 [0-9A-Fa-f]+h {return NUMHEX;}
 "\n"	{return '\n';}
 .	{ /*Do nothing*/}

@@ -5,14 +5,10 @@
 %}
 
 /* Bison declarations.  */
-/*%define api.value.type{double}*/
-%union{
-long intval;
-double val;
-}
+%define api.value.type{long long}
 %token NOT 102
 %token NUMBIN 200
-%token <intval> NUMDEC 201
+%token NUMDEC 201
 %token NUMHEX 202
 %token PUSH 300
 %token POP 301
@@ -26,8 +22,6 @@ double val;
 %precedence NEG NOT   /* negation--unary minus */
 %right '^'        /* exponentiation */
 
-%type <val> exp
-
 %% /* The grammar follows.  */
 
 input:
@@ -37,19 +31,19 @@ input:
 
 line:
   '\n'
-| exp '\n'  { printf ("\t%.10g\n", $1); }
+| exp '\n'  { printf ("\t%lld\n", $1); }
 ;
 
 exp:
-  NUMDEC             { $$ = $1;	     }
-| exp AND exp	     { $$ = (long long)$1 & (long long)$3;    }
-| exp OR exp	     { $$ = (long long)$1 | (long long)$3;    }
-| NOT exp            { $$ = ~(long long)$2;}
+  NUMDEC             { $$ = $1;   }
+| exp AND exp	     { $$ = $1 & $3;    }
+| exp OR exp	     { $$ = $1 | $3;    }
+| NOT exp            { $$ = ~$2;}
 | exp '+' exp        { $$ = $1 + $3;      }
 | exp '-' exp        { $$ = $1 - $3;      }
 | exp '*' exp        { $$ = $1 * $3;      }
 | exp '/' exp        { $$ = $1 / $3;      }
-| exp '\\' exp	     { $$ = fmod($1,$3);  }
+| exp '\\' exp	     { $$ = $1 % $3;  }
 | '-' exp  %prec NEG { $$ = -$2;          }
 | exp '^' exp        { $$ = pow($1,$3);   }
 | '(' exp ')'        { $$ = $2;           }
