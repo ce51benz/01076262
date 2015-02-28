@@ -1,5 +1,5 @@
 all:infix.tab.o lex.yy.o
-	gcc infix.tab.o lex.yy.o -o bisonrun
+	gcc infix.tab.o lex.yy.o -lm -o bisonrun
 infix.tab.o:infix.tab.c
 	gcc -c infix.tab.c
 lex.yy.o:infix.tab.h lex.yy.c

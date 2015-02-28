@@ -1,7 +1,7 @@
 %{
   #include <stdio.h>
+  #include <math.h>
   void yyerror (char const *);
-  double powlong(long,long);
 %}
 
 /* Bison declarations.  */
@@ -41,7 +41,7 @@ line:
 ;
 
 exp:
-  NUMDEC             { $$ = $1;	        }
+  NUMDEC             { $$ = $1;	     }
 | exp AND exp	     { $$ = (long long)$1 & (long long)$3;    }
 | exp OR exp	     { $$ = (long long)$1 | (long long)$3;    }
 | NOT exp            { $$ = ~(long long)$2;}
@@ -49,22 +49,15 @@ exp:
 | exp '-' exp        { $$ = $1 - $3;      }
 | exp '*' exp        { $$ = $1 * $3;      }
 | exp '/' exp        { $$ = $1 / $3;      }
-| exp '\\' exp	     { $$ = (long)$1 % (long)$3;	  }
+| exp '\\' exp	     { $$ = fmod($1,$3);  }
 | '-' exp  %prec NEG { $$ = -$2;          }
-| exp '^' exp        { $$ = powlong($1,$3);}
+| exp '^' exp        { $$ = pow($1,$3);   }
 | '(' exp ')'        { $$ = $2;           }
 | '[' exp ']'	     { $$ = $2;		  }
 | '{' exp '}'	     { $$ = $2;		  }
 ;
 
 %%
-double powlong(long base,long pownum){
-long i;
-double sum = 1;
-for(i = 1;i<=pownum;i++)
-	sum = sum * base;
-return sum;
-}
 
 void yyerror(char const *str){
 printf("BENZ ERROR:%s\n",str);
