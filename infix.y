@@ -31,11 +31,13 @@ input:
 
 line:
   '\n'
-| exp '\n'  { printf ("\t%lld\n", $1); }
+| exp '\n'  { printf ("\t%lld\n", $1);}
 ;
 
 exp:
   NUMDEC             { $$ = $1;   }
+| NUMBIN	     { $$ = $1;   }
+| NUMHEX	     { $$ = $1;   }
 | exp AND exp	     { $$ = $1 & $3;    }
 | exp OR exp	     { $$ = $1 | $3;    }
 | NOT exp            { $$ = ~$2;}
