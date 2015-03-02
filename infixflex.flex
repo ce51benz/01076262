@@ -31,6 +31,19 @@ long long strhextolong(char *);
 [01]+b	{yylval = strbittolong(yytext);return NUMBIN;}
 [0-9]+	{yylval = atol(yytext);return NUMDEC;}
 [0-9A-Fa-f]+h {yylval = strhextolong(yytext);return NUMHEX;}
+"$r0"	{return REG0;}
+"$r1"	{return REG1;}
+"$r2"	{return REG2;}
+"$r3"	{return REG3;}
+"$r4"	{return REG4;}
+"$r5"	{return REG5;}
+"$r6"	{return REG6;}
+"$r7"	{return REG7;}
+"$r8"	{return REG8;}
+"$r9"	{return REG9;}
+"$acc"	{return REGACC;}
+"$size"	{return REGSIZE;}
+"$top"	{return REGTOP;}
 "\n"	{return '\n';}
 .	{ /*Do nothing*/}
 %%
