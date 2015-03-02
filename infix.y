@@ -2,6 +2,7 @@
 %{
   #include <stdio.h>
   #include <math.h>
+  #include <stdlib.h>
   #define R0 0
   #define R1 1
   #define R2 2
@@ -15,6 +16,15 @@
   #define RACC 10
   #define RSIZE 11
   #define RTOP 12
+  typedef struct {
+  long long top;
+  long long *size;
+  long long *arr;
+  long long maxsize;
+  }stack;
+  stack infixst;
+  void push(stack *,long long);
+  long long pop(stack *);
   void yyerror (char const *);
   long long r[13];
 %}
@@ -56,8 +66,16 @@ line:
 			 else
 				r[$4] = r[$2];
 			}
-| PUSH reg { /*To be continued*/}
-| POP reg  { /*To be continued*/}
+| PUSH reg { push(&infixst,r[$2]);}
+| POP reg  { if($2 == RTOP)
+		printf("$top is READONLY!\n");
+	     else if($2 == RSIZE)
+		printf("$size is READONLY!\n");
+	     else if(r[RSIZE] == 0)
+			printf("Stack is empty.\n");
+	     else
+		r[$2] = pop(&infixst);
+	   }
 ;
 
 exp:
@@ -99,10 +117,44 @@ reg:REG0{$$ = R0;}
 %%
 
 void yyerror(char const *str){
+/*To be continued*/
 printf("ERROR:%s\n",str);
 }
 
+void push(stack *st,long long value){
+	if(*(st->size) == st->maxsize){
+		st->maxsize = log10(st->maxsize)/log10(2);
+		st->maxsize = pow(2,++st->maxsize);
+		long long *arrnew = malloc(8*(st->maxsize));
+		int j;
+		for(j=0;j < *(st->size) ;j++){
+		*(arrnew+j*8) = *((st->arr)+j*8);
+		}
+		/*Free unnescessary old arr*/	
+		free(st->arr);
+		st->arr = arrnew;
+	}
+	(*(st->size))++;
+	r[RTOP] = *( (st->arr) + (++(st->top))*8 ) =  value;
+	
+}
+
+long long pop(stack *st){
+	if(st->top != -1){
+		if(st->top > 0)
+			r[RTOP] = *(st->arr+(st->top-1)*8);
+		else
+			r[RTOP] = 0;
+	(*(st->size))--;
+	return *(st->arr+(st->top--)*8);		
+	}
+}
+
 void main(){
+infixst.top = -1;
+infixst.size = &r[RSIZE];
+infixst.maxsize = 1;
+infixst.arr = malloc(8);
 yyparse();
 }
 
