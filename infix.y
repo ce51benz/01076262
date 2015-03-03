@@ -60,22 +60,29 @@ line:
 | exp '\n'  { printf ("\t%lld\n", $1);r[RACC]=$1;}
 | SHOW reg '\n'{ printf("\t%lld\n",r[$2]); }
 | COPY reg TO reg '\n' { if($4 == RTOP)
-				printf("$top is READONLY!\n");
+				yyerror("$top is READONLY!");
 			 else if($4 == RSIZE)
-				printf("$size is READONLY!\n");
+				yyerror("$size is READONLY!");
 			 else
 				r[$4] = r[$2];
 			}
-| PUSH reg { push(&infixst,r[$2]);}
-| POP reg  { if($2 == RTOP)
-		printf("$top is READONLY!\n");
+| PUSH reg '\n'{ push(&infixst,r[$2]);}
+| POP reg  '\n'{ if($2 == RTOP)
+		yyerror("$top is READONLY!");
 	     else if($2 == RSIZE)
-		printf("$size is READONLY!\n");
+		yyerror("$size is READONLY!");
 	     else if(r[RSIZE] == 0)
-			printf("Stack is empty.\n");
+			yyerror("Stack is empty.");
 	     else
 		r[$2] = pop(&infixst);
 	   }
+| PUSH error '\n'{yyerror("Missing register operand");}
+| POP error '\n'{yyerror("Missing register operand");}
+| SHOW error '\n'{yyerror("Missing register operand");}
+| COPY reg TO error '\n' {yyerror("Missing register operand 2");}
+| COPY error TO reg '\n' {yyerror("Missing register operand 1");}
+| COPY reg error reg '\n'{yyerror("Missing TO ");}
+| reg TO reg '\n'{yyerror("Missing COPY ");}
 ;
 
 exp:
@@ -117,7 +124,7 @@ reg:REG0{$$ = R0;}
 %%
 
 void yyerror(char const *str){
-/*To be continued*/
+if(strcmp(str,"syntax error")) 
 printf("ERROR:%s\n",str);
 }
 
