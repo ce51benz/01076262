@@ -23,6 +23,7 @@
   long long maxsize;
   }stack;
   stack infixst;
+  int errflag;
   void push(stack *,long long);
   long long pop(stack *);
   void yyerror (char const *);
@@ -47,7 +48,6 @@
 %left '*' '/' '\\'
 %precedence NEG NOT   /* negation--unary minus */
 %right '^'        /* exponentiation */
-
 %% /* The grammar follows.  */
 
 input:
@@ -57,7 +57,11 @@ input:
 
 line:
   '\n'
-| exp '\n'  { printf ("\t%lld\n", $1);r[RACC]=$1;}
+| exp '\n'  { if(!errflag){
+		printf ("\t%lld\n", $1);r[RACC]=$1;
+		}
+	      else errflag = 0;
+	    }
 | SHOW reg '\n'{ printf("\t%lld\n",r[$2]); }
 | COPY reg TO reg '\n' { if($4 == RTOP)
 				yyerror("$top is READONLY!");
@@ -72,7 +76,7 @@ line:
 	     else if($2 == RSIZE)
 		yyerror("$size is READONLY!");
 	     else if(r[RSIZE] == 0)
-			yyerror("Stack is empty.");
+		yyerror("Stack is empty.");
 	     else
 		r[$2] = pop(&infixst);
 	   }
@@ -83,6 +87,9 @@ line:
 | COPY error TO reg '\n' {yyerror("Missing register operand 1");}
 | COPY reg error reg '\n'{yyerror("Missing TO ");}
 | reg TO reg '\n'{yyerror("Missing COPY ");}
+| reg TO reg error '\n'{yyerror("Unknown register and token operation");}
+| COPY reg TO reg error '\n'{yyerror("Unknown token after register operand 2");}
+| error '\n' {yyerror("Invalid expression input");yyerrok;}
 ;
 
 exp:
@@ -93,16 +100,26 @@ exp:
 | exp AND exp	     { $$ = $1 & $3;    }
 | exp OR exp	     { $$ = $1 | $3;    }
 | NOT exp            { $$ = ~$2;}
-| exp '+' exp        { $$ = $1 + $3;      }
-| exp '-' exp        { $$ = $1 - $3;      }
+| exp '+' exp        { $$ = $1 + $3;}
+| exp '-' exp        { $$ = $1 - $3;   }
 | exp '*' exp        { $$ = $1 * $3;      }
-| exp '/' exp        { $$ = $1 / $3;      }
-| exp '\\' exp	     { $$ = $1 % $3;  }
-| '-' exp  %prec NEG { $$ = -$2;          }
+| exp '/' exp        { if($3 == 0)
+			{yyerror("Divisor cannot be 0");errflag=1;
+			}
+			else $$ = $1 / $3;
+		     }
+
+| exp '\\' exp	     { if($3 == 0)
+			{yyerror("Divisor cannot be 0");errflag=1;
+			}
+			else $$ = $1 % $3;
+		     }
+| '-' exp  %prec NEG{ $$ = -$2; }
 | exp '^' exp        { $$ = pow($1,$3);   }
-| '(' exp ')'        { $$ = $2;           }
+| '(' exp ')' { $$ = $2;           }
 | '[' exp ']'	     { $$ = $2;		  }
 | '{' exp '}'	     { $$ = $2;		  }
+
 ;
 
 reg:REG0{$$ = R0;}
@@ -158,6 +175,7 @@ long long pop(stack *st){
 }
 
 void main(){
+errflag = 0;
 infixst.top = -1;
 infixst.size = &r[RSIZE];
 infixst.maxsize = 1;
