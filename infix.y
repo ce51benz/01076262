@@ -27,7 +27,8 @@
   void push(stack *,long long);
   long long pop(stack *);
   void yyerror (char const *);
-  long long r[13];
+  long long r[12];
+  long long *rtop;
 %}
 
 /* Bison declarations.  */
@@ -62,15 +63,35 @@ line:
 		}
 	      else errflag = 0;
 	    }
-| SHOW reg '\n'{ printf("\t%lld\n",r[$2]); }
+| SHOW reg '\n'{ if($2 != RTOP)printf("\t%lld\n",r[$2]);
+		 else {if(rtop!=NULL)printf("\t%lld\n",*rtop);
+			else yyerror("$top is NULL");
+		 }
+		}
+
+
 | COPY reg TO reg '\n' { if($4 == RTOP)
 				yyerror("$top is READONLY!");
 			 else if($4 == RSIZE)
 				yyerror("$size is READONLY!");
-			 else
-				r[$4] = r[$2];
+			 else{
+				if($2 != RTOP)
+					r[$4] = r[$2];
+				else if(rtop!=NULL)
+					r[$4] = *rtop;
+				else
+					yyerror("$top is NULL");			
+			     }
 			}
-| PUSH reg '\n'{ push(&infixst,r[$2]);}
+
+| PUSH reg '\n'{ if($2 != RTOP)
+			push(&infixst,r[$2]);
+		 else if(rtop!=NULL)
+			push(&infixst,*rtop);
+		 else
+			yyerror("$top is NULL");
+		}
+
 | POP reg  '\n'{ if($2 == RTOP)
 		yyerror("$top is READONLY!");
 	     else if($2 == RSIZE)
@@ -96,7 +117,15 @@ exp:
   NUMDEC             { $$ = $1;   }
 | NUMBIN	     { $$ = $1;   }
 | NUMHEX	     { $$ = $1;   }
-| reg		     { $$ = r[$1]; }
+| reg		     { 
+			if($1 != RTOP)
+				$$ = r[$1];
+			else if(rtop != NULL)
+				$$ = *rtop;
+			else {
+				yyerror("$top is NULL");errflag = 1;
+			} 
+		     }
 | exp AND exp	     { $$ = $1 & $3;    }
 | exp OR exp	     { $$ = $1 | $3;    }
 | NOT exp            { $$ = ~$2;}
@@ -159,27 +188,28 @@ void push(stack *st,long long value){
 		st->arr = arrnew;
 	}
 	(*(st->size))++;
-	r[RTOP] = *( (st->arr) + (++(st->top))*8 ) =  value;
-	
+	*( (st->arr) + (++(st->top))*8 ) =  value;
+	rtop = (st->arr) + (st->top)*8; 
 }
 
 long long pop(stack *st){
 	if(st->top != -1){
 		if(st->top > 0)
-			r[RTOP] = *(st->arr+(st->top-1)*8);
+			rtop = (st->arr) + ((st->top)-1)*8;
 		else
-			r[RTOP] = 0;
+			rtop = NULL;
 	(*(st->size))--;
-	return *(st->arr+(st->top--)*8);		
+	return *(st->arr+(st->top--)*8);
 	}
 }
-
+/*Register alone expression????!!!!*/
 void main(){
 errflag = 0;
 infixst.top = -1;
 infixst.size = &r[RSIZE];
 infixst.maxsize = 1;
 infixst.arr = malloc(8);
+rtop = NULL;
 yyparse();
 }
 
