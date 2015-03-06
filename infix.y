@@ -17,7 +17,8 @@
   #define RSIZE 11
   #define RTOP 12
   typedef struct {
-  long long top;
+  long long **top; /*top keep pointer to top register which keep
+			pointer to top of stack*/
   long long *size;
   long long *arr;
   long long maxsize;
@@ -101,15 +102,15 @@ line:
 	     else
 		r[$2] = pop(&infixst);
 	   }
-| PUSH error '\n'{yyerror("Missing register operand");}
-| POP error '\n'{yyerror("Missing register operand");}
-| SHOW error '\n'{yyerror("Missing register operand");}
-| COPY reg TO error '\n' {yyerror("Missing register operand 2");}
-| COPY error TO reg '\n' {yyerror("Missing register operand 1");}
-| COPY reg error reg '\n'{yyerror("Missing TO ");}
+| PUSH error '\n'{yyerror("Missing register operand");yyerrok;}
+| POP error '\n'{yyerror("Missing register operand");yyerrok;}
+| SHOW error '\n'{yyerror("Missing register operand");yyerrok;}
+| COPY reg TO error '\n' {yyerror("Missing register operand 2");yyerrok;}
+| COPY error TO reg '\n' {yyerror("Missing register operand 1");yyerrok;}
+| COPY reg error reg '\n'{yyerror("Missing TO ");yyerrok;}
 | reg TO reg '\n'{yyerror("Missing COPY ");}
-| reg TO reg error '\n'{yyerror("Unknown register and token operation");}
-| COPY reg TO reg error '\n'{yyerror("Unknown token after register operand 2");}
+| reg TO reg error '\n'{yyerror("Unknown register and token operation");yyerrok;}
+| COPY reg TO reg error '\n'{yyerror("Unknown token after register operand 2");yyerrok;}
 | error '\n' {yyerror("Invalid expression input");yyerrok;}
 ;
 
@@ -117,7 +118,7 @@ exp:
   NUMDEC             { $$ = $1;   }
 | NUMBIN	     { $$ = $1;   }
 | NUMHEX	     { $$ = $1;   }
-| reg		     { 
+| reg		     {
 			if($1 != RTOP)
 				$$ = r[$1];
 			else if(rtop != NULL)
@@ -130,8 +131,8 @@ exp:
 | exp OR exp	     { $$ = $1 | $3;    }
 | NOT exp            { $$ = ~$2;}
 | exp '+' exp        { $$ = $1 + $3;}
-| exp '-' exp        { $$ = $1 - $3;   }
-| exp '*' exp        { $$ = $1 * $3;      }
+| exp '-' exp        { $$ = $1 - $3;}
+| exp '*' exp        { $$ = $1 * $3;}
 | exp '/' exp        { if($3 == 0)
 			{yyerror("Divisor cannot be 0");errflag=1;
 			}
@@ -187,29 +188,28 @@ void push(stack *st,long long value){
 		free(st->arr);
 		st->arr = arrnew;
 	}
-	(*(st->size))++;
-	*( (st->arr) + (++(st->top))*8 ) =  value;
-	rtop = (st->arr) + (st->top)*8; 
+	*( (st->arr) + ((*(st->size))++)*8 ) =  value;
+	*(st->top) = (st->arr) + (*(st->size)-1)*8; 
 }
 
 long long pop(stack *st){
-	if(st->top != -1){
-		if(st->top > 0)
-			rtop = (st->arr) + ((st->top)-1)*8;
+	if(*(st->size) > 0){
+		if(*(st->size) > 1)
+			*(st->top) = (st->arr) + (*(st->size)-2)*8;
 		else
-			rtop = NULL;
+			*(st->top) = NULL;
 	(*(st->size))--;
-	return *(st->arr+(st->top--)*8);
+	return *(st->arr+(*(st->size))*8);
 	}
 }
-/*Register alone expression????!!!!*/
+
 void main(){
 errflag = 0;
-infixst.top = -1;
+rtop = NULL;
+infixst.top = &rtop;
 infixst.size = &r[RSIZE];
 infixst.maxsize = 1;
 infixst.arr = malloc(8);
-rtop = NULL;
 yyparse();
 }
 
