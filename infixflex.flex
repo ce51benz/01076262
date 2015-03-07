@@ -46,7 +46,8 @@ long long strhextolong(char *);
 "$size"	{return REGSIZE;}
 "$top"	{return REGTOP;}
 "\n"	{return '\n';}
-.	{ /*Do nothing*/}
+" "	{ /*Read whitespace but do nothing.*/}
+.	{ return UNKNOWN; /*Return this token to mark that the input is invalid.*/}
 %%
 
 /*This function use to read string and convert it to bit representation

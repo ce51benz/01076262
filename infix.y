@@ -63,7 +63,7 @@
 %token SHOW 302
 %token COPY 303
 %token TO 400
-
+%token UNKNOWN 1000
 /*OR operation has precedence less than AND operation,
 assosication is do from left to right.*/
 %left OR 101
