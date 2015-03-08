@@ -1,13 +1,16 @@
 %option noyywrap
 %{
 #include<stdio.h>
-#include "infix.tab.h" /*Reference infix.tab.h because this flex file use token type code base on declaration in bison file.*/ 
+#include "infix.tab.h" /*Reference infix.tab.h because this flex file 
+use token type code base on declaration in bison file.*/ 
 #include<ctype.h>
 long long strbittolong(char *);
 long long strhextolong(char *);
 %}
 
-/*Regular expression with related action*/
+/*Regular expression with related action.
+(Return token type code with send lexeme(semantic value) for
+NUMBIN/NUMDEC/NUMHEX token.)*/
 %%
 [+]	{return '+';}
 [-]	{return '-';}
@@ -53,7 +56,8 @@ long long strhextolong(char *);
 /*This function use to read string and convert it to bit representation
 by read each character and substract each character by 0x30
 to get real bit (either 0 or 1) keep that value in new variable
-and shift that variable 1 bit for everytime which each character is read.*/
+and shift that variable 1 bit in left direction
+for everytime which each character is read.*/
 long long strbittolong(char *str){
 	long long x = 0;
 	int i,leng=strlen(str)-1;
@@ -67,7 +71,8 @@ by read each character and substract character either by 0x30 or 0x37
 base on type of character(digit or alphabet)
 to get real nibble (0000 to 1111) keep that value in new variable
 convert alphabet to uppercase if necessary.
-The last thing is shift that variable 4 bit for everytime which each character is read.*/
+The last thing is shift that variable 4 bit in left direction for everytime 
+which each character is read.*/
 long long strhextolong(char *str){
 	long long x = 0;
 	int i,leng = strlen(str)-1;
