@@ -2,48 +2,45 @@
 #include<stdio.h>
 void yyerror(char *);
 %}
-%token START END MAIN UNKNOWN NEWLINE
+%token START END MAIN NEWLINE
 %token NUMDEC NUMHEX
 %token SHOWBASE10 SHOWBASE16 
-%token SLL SRL AND OR NOT
 %token IF THEN EQUTO
 %token LOOP TO DO
-%token VAR0 VAR1 VAR2 VAR3 VAR4 VAR5 VAR6 VAR7 VAR8 VAR9 VAR10 VAR11 VAR12 VAR13 VAR14 VAR15 VAR16 VAR17 VAR18 VAR19 VAR20 VAR21 VAR22 VAR23 VAR24 VAR25
+%token VAR UNKNOWN
 
-%left OR
-%left AND
+%left '|'
+%left '&'
 %left SLL SRL
 %left '+' '-'
 %left '*' '\\' '/'
-%right NOT
+%right '~'
 %%
-input:START MAIN NEWLINE stmts END MAIN {printf("PASS!");};
-input:START MAIN NEWLINE stmts END MAIN NEWLINE{printf("PASS!");};
-stmts:stdstmt stmts|condstmt stmts|stdstmt|condstmt|loopstmt stmts|loopstmt;
-stdstmts:stdstmt stdstmts|stdstmt;
-stdstmt:var '=' exp NEWLINE 
-|SHOWBASE10 var NEWLINE
-|SHOWBASE16 var NEWLINE
+input:START MAIN NEWLINE stmts END MAIN
+|START MAIN NEWLINE stmts END MAIN NEWLINE;
+stmts:stdstmt stmts|condstmt stmts|loopstmt stmts|stdstmt|condstmt|loopstmt;
+stdstmt:VAR '=' exp NEWLINE
+|SHOWBASE10 VAR NEWLINE
+|SHOWBASE16 VAR NEWLINE
 ;
-condstmt:IF exp EQUTO exp THEN NEWLINE stdstmts END IF NEWLINE;
-loopstmt:LOOP var '=' exp TO exp DO NEWLINE stdstmts END LOOP NEWLINE;
+condstmt:IF varconst EQUTO varconst THEN NEWLINE stdstmt;
+loopstmt:LOOP const TO const DO NEWLINE stdstmt;
 
-var:VAR0|VAR1|VAR2|VAR3|VAR4|VAR5|VAR6|VAR7|VAR8|VAR9|VAR10|VAR11|VAR12|VAR13|VAR14|VAR15|VAR16|VAR17|VAR18|VAR19|VAR20|VAR21|VAR22|VAR23|VAR24|VAR25;
+varconst:VAR|const;
+const:NUMDEC|NUMHEX;
 
-exp:NUMDEC
-|NUMHEX
-|var
+exp:varconst
 |exp SLL exp
 |exp SRL exp
-|exp AND exp
-|exp OR exp
-|NOT exp
+|exp '&' exp
+|exp '|' exp
+|'~' exp
 |exp '+' exp
 |exp '-' exp
 |exp '*' exp
 |exp '/' exp
 |exp '\\' exp
-|'-' exp %prec NOT
+|'-' exp %prec '~'
 |'(' exp ')'
 |'[' exp ']'
 |'{' exp '}'
