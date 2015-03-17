@@ -99,11 +99,10 @@ assosication is do from left to right.
 /* Negation--unary minus and NOT bitwise operation
 which has higher precedence than OR,AND,+,-,*,/,\ 
 
-The %precedence use to tell that both token have no association
-but the defined-grammar will force calculator to do both operation from
-right to left.
+The %right use to tell that the token have right association
+(do operations from right to left).
 */
-%precedence NEG NOT   
+%right NEG NOT   
 
 /* Exponentiation,which has highest precedence
 (but less than parentheses).*/
