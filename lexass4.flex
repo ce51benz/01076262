@@ -1,6 +1,6 @@
 %option noyywrap
 %{
-#include "testass4.tab.h"
+#include "ass4.tab.h"
 #include <stdio.h>
 %}
 
@@ -10,8 +10,8 @@ MAIN 		{return MAIN;}
 END 		{return END;}
 SHOWBASE10	{return SHOWBASE10;}
 SHOWBASE16	{return SHOWBASE16;}
-[0-9]+ 		{return NUMDEC;}
-0x[0-9A-Fa-f]+ 	{return NUMHEX;}
+[0-9]+ 		{yylval = strtol(yytext,NULL,10);return NUMDEC;}
+0x[0-9A-Fa-f]+ 	{yylval = strtol(yytext,NULL,16);return NUMHEX;}
 [+]		{return '+';}
 [-]		{return '-';}
 [*]		{return '*';}
