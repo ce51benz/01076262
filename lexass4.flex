@@ -2,6 +2,7 @@
 %{
 #include "ass4.tab.h"
 #include <stdio.h>
+#include <ctype.h>
 %}
 
 %%
@@ -36,7 +37,13 @@ SHOWBASE16	{return SHOWBASE16;}
 "TO"		{return TO;}
 "DO"		{return DO;}
 [\r\n]+ 	{return NEWLINE;}
-$[A-Za-z]	{return VAR;}
+$[A-Za-z]	{
+			if(isupper(yytext[1]))
+				yylval = yytext[1] -('A'-1);
+			else
+				yylval = yytext[1] -('a'-1);
+			return VAR;
+		}
 [$A-Za-z0-9]+ 	{return UNKNOWN; }
 [ \t] 		{ }
 .    		{ return UNKNOWN;} 
