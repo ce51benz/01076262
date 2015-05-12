@@ -10,7 +10,10 @@ typedef struct _node{
 	char* lexame;
 }NODE;
 void traversetree(NODE *);
+int isinconstarr(long);
 GPtrArray *execseq;
+GArray *constarr;
+FILE *fp;
 %}
 %define api.value.type{long}
 
@@ -32,7 +35,12 @@ input:START MAIN NEWLINE stmts END MAIN
 |START MAIN NEWLINE stmts END MAIN NEWLINE{
 	int k;
 	NODE *ptr;
-	FILE *fp = fopen("output.s","w");
+	fp = fopen("output.s","w");
+	fprintf(fp,".text\n");
+	fprintf(fp,".align 2\n");
+	fprintf(fp,".global _start\n");
+	fprintf(fp,"_start:\n");
+
 	for(k=execseq->len-1;k>=0;k--){
 		ptr = g_ptr_array_index(execseq,k);
 		g_printf("%s\n",ptr->lexame);
@@ -48,6 +56,151 @@ input:START MAIN NEWLINE stmts END MAIN
 		}
 		else if(ptr->ttype==IF);
 		else;
+	}
+	fprintf(fp,"\tMOV\tR0,#0\n");
+    	fprintf(fp,"\tMOV\tR7,#1\n");
+    	fprintf(fp,"\tSWI\t0\n");
+	fprintf(fp,"\n\n");
+	fprintf(fp,"showbase10:\n");
+	fprintf(fp,"\tLDR\tR1,=showout\n");
+	fprintf(fp,"\tMOV\tR0,#1\n");
+    	fprintf(fp,"\tMOV\tR2,#1\n");
+	fprintf(fp,"\tLDR\tR11,=const\n");
+	fprintf(fp,"\tLDR\tR11,[R11,#0]\n");
+	fprintf(fp,"\tCMP\tR11,#10\n");
+	fprintf(fp,"\tBLT\tsb10exit3\n");
+	fprintf(fp,"sb10chkpt:\n");
+	fprintf(fp,"\tMOV\tR12,#10\n");
+	fprintf(fp,"\tMOV\tR9,#0\n");
+	fprintf(fp,"\tMOV\tR10,R11\n");
+	fprintf(fp,"sb10warp:\n");
+	fprintf(fp,"\tCMP\tR10,#10\n");
+	fprintf(fp,"\tBLT\tsb10endpt\n");
+	fprintf(fp,"\tSDIV\tR10,R10,R12\n");
+	fprintf(fp,"\tADD\tR9,R9,#1\n");
+	fprintf(fp,"\tB\tsb10warp\n");
+	fprintf(fp,"sb10endpt:\n");
+	fprintf(fp,"\tMOV\tR12,#0\n");
+	fprintf(fp,"\tMOV\tR8,#10\n");
+	fprintf(fp,"\tMOV\tR7,#1\n");
+	fprintf(fp,"sb10chkpt1:\n");
+	fprintf(fp,"\tCMP\tR12,R9\n");
+	fprintf(fp,"\tBGE\tsb10exit2\n");
+	fprintf(fp,"\tMUL\tR10,R7,R8\n");
+	fprintf(fp,"\tMOV\tR7,R10\n");
+	fprintf(fp,"\tADD\tR12,R12,#1\n");
+	fprintf(fp,"\tB\tsb10chkpt1\n");
+	fprintf(fp,"sb10exit2:\n");
+	fprintf(fp,"\tSDIV\tR12,R11,R10\n");
+	fprintf(fp,"\tMOV\tR7,#4\n");
+	fprintf(fp,"\tMOV\tR9,R12\n");
+	fprintf(fp,"\tADD\tR9,R9,#0x30\n");
+	fprintf(fp,"\tSTRB\tR9,[R1]\n");
+	fprintf(fp,"\tSWI\t0\n");
+	fprintf(fp,"\tADD\tR1,R1,#1\n");
+	fprintf(fp,"\tMUL\tR7,R10,R12\n");
+	fprintf(fp,"\tSUB\tR11,R11,R7\n");
+	fprintf(fp,"\tCMP\tR11,#10\n");
+	fprintf(fp,"\tBLE\tsb10exit3\n");
+	fprintf(fp,"\tB\tsb10chkpt\n");
+	fprintf(fp,"sb10exit3:\n");
+	fprintf(fp,"\tMOV\tR7,#4\n");
+	fprintf(fp,"\tADD\tR11,R11,#0x30\n");
+	fprintf(fp,"\tSTRB\tR11,[R1]\n");
+	fprintf(fp,"\tSWI\t0\n");
+	fprintf(fp,"\tPOP\t{R0}\n");
+	fprintf(fp,"\tPOP\t{R1}\n");
+	fprintf(fp,"\tPOP\t{R2}\n");
+	fprintf(fp,"\tPOP\t{R7}\n");
+	fprintf(fp,"\tPOP\t{R8}\n");
+	fprintf(fp,"\tPOP\t{R9}\n");
+	fprintf(fp,"\tPOP\t{R10}\n");
+	fprintf(fp,"\tPOP\t{R11}\n");
+	fprintf(fp,"\tPOP\t{R12}\n");
+	fprintf(fp,"\tMOV\tPC,LR\n");	
+	fprintf(fp,"\n\n");
+
+	fprintf(fp,"showbase16:\n");
+	fprintf(fp,"\tLDR\tR1,=showprefix\n");
+	fprintf(fp,"\tMOV\tR0,#1\n");
+    	fprintf(fp,"\tMOV\tR2,#2\n");
+	fprintf(fp,"\tMOV\tR7,#4\n");
+	fprintf(fp,"\tSWI\t0\n");
+	fprintf(fp,"\tLDR\tR1,=showout\n");
+	fprintf(fp,"\tMOV\tR2,#1\n");
+	
+	fprintf(fp,"\n\tLDR\tR11,=const\n");
+	fprintf(fp,"\tLDR\tR11,[R11,#0]\n");
+	fprintf(fp,"\tMOV\tR12,#0xF\n");
+	fprintf(fp,"\tLSL\tR12,R12,#28\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tLSR\tR10,R10,#28\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tLSR\tR12,R12,#4\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tLSR\tR10,R10,#24\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tLSR\tR12,R12,#4\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tLSR\tR10,R10,#20\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tLSR\tR12,R12,#4\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tLSR\tR10,R10,#16\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tLSR\tR12,R12,#4\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tLSR\tR10,R10,#12\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tLSR\tR12,R12,#4\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tLSR\tR10,R10,#8\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tLSR\tR12,R12,#4\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tLSR\tR10,R10,#4\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tLSR\tR12,R12,#4\n");
+	fprintf(fp,"\tAND\tR10,R11,R12\n");
+	fprintf(fp,"\tBL\tnumout\n");
+	fprintf(fp,"\tPOP\t{R0}\n");
+	fprintf(fp,"\tPOP\t{R1}\n");
+	fprintf(fp,"\tPOP\t{R2}\n");
+	fprintf(fp,"\tPOP\t{R7}\n");
+	fprintf(fp,"\tPOP\t{R10}\n");
+	fprintf(fp,"\tPOP\t{R11}\n");
+	fprintf(fp,"\tPOP\t{R12}\n");
+	fprintf(fp,"\tMOV\tPC,LR\n");
+
+
+
+	fprintf(fp,"numout:\n");
+	fprintf(fp,"\tCMP\tR10,#9\n");
+	fprintf(fp,"\tBGT\talphaput\n");
+	fprintf(fp,"\tADD\tR10,R10,#0x30\n");
+	fprintf(fp,"\tB\tputchkpt\n");
+	fprintf(fp,"alphaput:\n");
+	fprintf(fp,"\tADD\tR10,R10,#55\n");	
+	fprintf(fp,"putchkpt:\n");
+	fprintf(fp,"\tSTRB\tr10,[r1]\n");
+	fprintf(fp,"\tSWI\t0\n");	
+	fprintf(fp,"\tMOV\tPC,LR\n");
+	fprintf(fp,".align 2\n");
+	fprintf(fp,".data\n");
+	fprintf(fp,"showprefix:\n");
+    	fprintf(fp,"\t.byte\t48,120\n");
+	fprintf(fp,"showout:\n");
+    	fprintf(fp,"\t.byte\t1\n");
+	
+	if(constarr->len>0){
+		fprintf(fp,"const:\n");
+		fprintf(fp,"\t.word\t");
+		for(k=0;k<constarr->len;k++){
+			fprintf(fp,"%d",g_array_index(constarr,long,k));
+			if(k+1 < constarr->len)
+				fputc(',',fp);
+		}
+		fputc('\n',fp);
 	}
 	fclose(fp);
 	//TRY to traverse AST?
@@ -278,8 +431,20 @@ exp:varconst{$$=$1;}
 
 void traversetree(NODE *node){
 	if(node!=NULL){
+		if(node->ttype==NUMDEC){
+			long n = strtol(node->lexame,NULL,10);
+			if(!isinconstarr(n))
+				g_array_append_val(constarr,n);
+		}
+		else if(node->ttype==NUMHEX){
+			long n = strtol(node->lexame,NULL,10);
+			if(!isinconstarr(n))
+				g_array_append_val(constarr,n);
+		}
+		else{
 		traversetree(node->left);
 		traversetree(node->right);
+		}
 	}
 }
 
@@ -291,13 +456,20 @@ int digitcol(long num){
 	}
 	return returnval;
 }
-
+int isinconstarr(long n){
+	int k;
+	for(k=0;k<constarr->len;k++){
+		if(n == g_array_index(constarr,long,k))return 1;
+	}
+	return 0;
+}
 void yyerror(char * str){
 printf("%s\n",str);
 }
 
 void main(){
 execseq = g_ptr_array_new();
+constarr = g_array_new(FALSE,TRUE,sizeof(long));
 yyparse();
 g_ptr_array_free(execseq,TRUE);
 }
