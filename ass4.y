@@ -2,13 +2,14 @@
 #include<stdio.h>
 #include<glib.h>
 void yyerror(char *);
+
 typedef struct _node{
  	struct _node *left;
 	struct _node *right;
 	int ttype;
 	char* lexame;
 }NODE;
-
+void traversetree(NODE *);
 GPtrArray *execseq;
 %}
 %define api.value.type{long}
@@ -29,6 +30,26 @@ GPtrArray *execseq;
 %%
 input:START MAIN NEWLINE stmts END MAIN
 |START MAIN NEWLINE stmts END MAIN NEWLINE{
+	int k;
+	NODE *ptr;
+	FILE *fp = fopen("output.s","w");
+	for(k=execseq->len-1;k>=0;k--){
+		ptr = g_ptr_array_index(execseq,k);
+		g_printf("%s\n",ptr->lexame);
+		if(ptr->ttype==SHOWBASE10){
+			g_printf("%s\n",(ptr->left)->lexame);
+		}
+		else if(ptr->ttype==SHOWBASE16){
+			g_printf("%s\n",(ptr->left)->lexame);
+		}
+		else if(ptr->ttype=='='){
+			g_printf("%s\n",(ptr->left)->lexame);
+			traversetree(ptr->right);
+		}
+		else if(ptr->ttype==IF);
+		else;
+	}
+	fclose(fp);
 	//TRY to traverse AST?
 };
 stmts:stdstmt stmts{g_ptr_array_add(execseq,GUINT_TO_POINTER($1));}|
@@ -249,11 +270,19 @@ exp:varconst{$$=$1;}
 	n->right = GUINT_TO_POINTER($2);
 	$$ = GPOINTER_TO_UINT(n);
 }
-|'(' exp ')'{$$ = $1;}
-|'[' exp ']'{$$ = $1;}
-|'{' exp '}'{$$ = $1;}
+|'(' exp ')'{$$ = $2;}
+|'[' exp ']'{$$ = $2;}
+|'{' exp '}'{$$ = $2;}
 ;
 %%
+
+void traversetree(NODE *node){
+	if(node!=NULL){
+		traversetree(node->left);
+		traversetree(node->right);
+	}
+}
+
 int digitcol(long num){
 	int returnval = 1;
 	while(num > 10){
@@ -262,6 +291,7 @@ int digitcol(long num){
 	}
 	return returnval;
 }
+
 void yyerror(char * str){
 printf("%s\n",str);
 }
