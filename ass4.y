@@ -9,11 +9,21 @@ typedef struct _node{
 	int ttype;
 	char* lexame;
 }NODE;
-void traversetree(NODE *);
-int isinconstarr(long);
+
+typedef struct _varstat{
+	int regid;
+	int stat;
+	int stoffset;
+}VARSTAT;
+int traversetree(NODE *);
+int findconstloc(long);
+void allocvartoreg(int);
+int findfreereg();
 GPtrArray *execseq;
 GArray *constarr;
 FILE *fp;
+int rst[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
+VARSTAT vst[26];
 %}
 %define api.value.type{long}
 
@@ -29,11 +39,11 @@ FILE *fp;
 %left SLL SRL
 %left '+' '-'
 %left '*' '\\' '/'
-%right '~'
+%right '~' NEG
 %%
 input:START MAIN NEWLINE stmts END MAIN
 |START MAIN NEWLINE stmts END MAIN NEWLINE{
-	int k;
+	int k,vid,destreg;
 	NODE *ptr;
 	fp = fopen("output.s","w");
 	fprintf(fp,".text\n");
@@ -45,14 +55,31 @@ input:START MAIN NEWLINE stmts END MAIN
 		ptr = g_ptr_array_index(execseq,k);
 		g_printf("%s\n",ptr->lexame);
 		if(ptr->ttype==SHOWBASE10){
-			g_printf("%s\n",(ptr->left)->lexame);
+			vid = strtol((ptr->left)->lexame,NULL,10)-1;
+			//Imply that the var is already assign some value.
+			//IF value of var is not in reg?? find from stack!?
+			fprintf(fp,"\tPUSH\t{R12}\n");
+			fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
+			fprintf(fp,"\tBL\tshowbase10\n");
 		}
 		else if(ptr->ttype==SHOWBASE16){
-			g_printf("%s\n",(ptr->left)->lexame);
+			vid = strtol((ptr->left)->lexame,NULL,10)-1;
+			//Imply that the var is already assign some value.
+			//IF value of var is not in reg?? find from stack!?
+			fprintf(fp,"\tPUSH\t{R12}\n");
+			fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
+			fprintf(fp,"\tBL\tshowbase16\n");
 		}
 		else if(ptr->ttype=='='){
-			g_printf("%s\n",(ptr->left)->lexame);
-			traversetree(ptr->right);
+			vid = strtol((ptr->left)->lexame,NULL,10)-1;
+			if(vst[vid].stat){
+				traversetree(ptr->right);
+			}
+			else{
+				allocvartoreg(vid);
+				destreg = traversetree(ptr->right);
+				fprintf(fp,"\tMOV\tR%d,R%d\n",vst[vid].regid,destreg);
+			}
 		}
 		else if(ptr->ttype==IF);
 		else;
@@ -61,11 +88,19 @@ input:START MAIN NEWLINE stmts END MAIN
     	fprintf(fp,"\tMOV\tR7,#1\n");
     	fprintf(fp,"\tSWI\t0\n");
 	fprintf(fp,"\n\n");
+
 	fprintf(fp,"showbase10:\n");
+	fprintf(fp,"\tPUSH\t{R11}\n");
+	fprintf(fp,"\tPUSH\t{R10}\n");
+	fprintf(fp,"\tPUSH\t{R9}\n");
+	fprintf(fp,"\tPUSH\t{R8}\n");
+	fprintf(fp,"\tPUSH\t{R7}\n");
+	fprintf(fp,"\tPUSH\t{R2}\n");
+	fprintf(fp,"\tPUSH\t{R1}\n");
+	fprintf(fp,"\tPUSH\t{R0}\n");
 	fprintf(fp,"\tMOV\tR0,#1\n");
     	fprintf(fp,"\tMOV\tR2,#1\n");
-	fprintf(fp,"\tLDR\tR11,=const\n");
-	fprintf(fp,"\tLDR\tR11,[R11,#0]\n");
+	fprintf(fp,"\tMOV\tR11,R12\n");
 	fprintf(fp,"\n\n");
 	fprintf(fp,"\tCMP\tR11,#0\n");
 	fprintf(fp,"\tBGE\tsb10skipminus\n");
@@ -216,7 +251,10 @@ input:START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\tMOV\tR7,#4\n");
 	fprintf(fp,"\tADD\tR11,R11,#0x30\n");
 	fprintf(fp,"\tSTRB\tR11,[R1]\n");
-	fprintf(fp,"\tSWI\t0\n");	
+	fprintf(fp,"\tSWI\t0\n");
+	fprintf(fp,"\tLDR\tR1,=newline\n");
+	fprintf(fp,"\tMOV\tR2,#2\n");
+	fprintf(fp,"\tSWI\t0\n");
 	fprintf(fp,"\tPOP\t{R0}\n");
 	fprintf(fp,"\tPOP\t{R1}\n");
 	fprintf(fp,"\tPOP\t{R2}\n");
@@ -230,6 +268,14 @@ input:START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\n\n");
 
 	fprintf(fp,"showbase16:\n");
+	fprintf(fp,"\tPUSH\t{LR}\n");
+	fprintf(fp,"\tPUSH\t{R11}\n");
+	fprintf(fp,"\tPUSH\t{R10}\n");
+	fprintf(fp,"\tPUSH\t{R7}\n");
+	fprintf(fp,"\tPUSH\t{R2}\n");
+	fprintf(fp,"\tPUSH\t{R1}\n");
+	fprintf(fp,"\tPUSH\t{R0}\n");
+
 	fprintf(fp,"\tLDR\tR1,=showprefix\n");
 	fprintf(fp,"\tMOV\tR0,#1\n");
     	fprintf(fp,"\tMOV\tR2,#2\n");
@@ -238,8 +284,7 @@ input:START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\tLDR\tR1,=showout\n");
 	fprintf(fp,"\tMOV\tR2,#1\n");
 	
-	fprintf(fp,"\n\tLDR\tR11,=const\n");
-	fprintf(fp,"\tLDR\tR11,[R11,#0]\n");
+	fprintf(fp,"\n\tMOV\tR11,R12\n");
 	fprintf(fp,"\tMOV\tR12,#0xF\n");
 	fprintf(fp,"\tLSL\tR12,R12,#28\n");
 	fprintf(fp,"\tAND\tR10,R11,R12\n");
@@ -272,12 +317,18 @@ input:START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\tLSR\tR12,R12,#4\n");
 	fprintf(fp,"\tAND\tR10,R11,R12\n");
 	fprintf(fp,"\tBL\tnumout\n");
+
+	fprintf(fp,"\tLDR\tR1,=newline\n");
+	fprintf(fp,"\tMOV\tR2,#2\n");
+	fprintf(fp,"\tSWI\t0\n");
+
 	fprintf(fp,"\tPOP\t{R0}\n");
 	fprintf(fp,"\tPOP\t{R1}\n");
 	fprintf(fp,"\tPOP\t{R2}\n");
 	fprintf(fp,"\tPOP\t{R7}\n");
 	fprintf(fp,"\tPOP\t{R10}\n");
 	fprintf(fp,"\tPOP\t{R11}\n");
+	fprintf(fp,"\tPOP\t{LR}\n");
 	fprintf(fp,"\tPOP\t{R12}\n");
 	fprintf(fp,"\tMOV\tPC,LR\n");
 
@@ -299,8 +350,6 @@ input:START MAIN NEWLINE stmts END MAIN
     	fprintf(fp,"\t.byte\t48,120\n");
 	fprintf(fp,"showout:\n");
     	fprintf(fp,"\t.byte\t1\n");
-	fprintf(fp,"minussign:\n");
-    	fprintf(fp,"\t.byte\t45\n");
 	if(constarr->len>0){
 		fprintf(fp,"const:\n");
 		fprintf(fp,"\t.word\t");
@@ -311,6 +360,10 @@ input:START MAIN NEWLINE stmts END MAIN
 		}
 		fputc('\n',fp);
 	}
+	fprintf(fp,"newline:\n");
+	fprintf(fp,"\t.byte\t13,10\n");
+	fprintf(fp,"minussign:\n");
+    	fprintf(fp,"\t.byte\t45\n");
 	fclose(fp);
 	//TRY to traverse AST?
 };
@@ -526,7 +579,7 @@ exp:varconst{$$=$1;}
 |'-' exp %prec '~' {
 	NODE *n = g_new(NODE,1);
 	n->left = NULL;
-	n->ttype = '-';
+	n->ttype = NEG;
 	gchar *str = g_strdup("-");
 	n->lexame = str;
 	n->right = GUINT_TO_POINTER($2);
@@ -538,23 +591,52 @@ exp:varconst{$$=$1;}
 ;
 %%
 
-void traversetree(NODE *node){
+int traversetree(NODE *node){
 	if(node!=NULL){
+		long loc,destreg,freereg;
 		if(node->ttype==NUMDEC){
 			long n = strtol(node->lexame,NULL,10);
-			if(!isinconstarr(n))
+			if(!(loc=findconstloc(n)*4)){
 				g_array_append_val(constarr,n);
+				loc = (constarr->len-1)*4;
+			}
+			else{
+				
+			}
+			destreg = findfreereg();
+			//Check if cannot alloc?
+			fprintf(fp,"\tLDR\tR%d,=const\n",destreg);
+			fprintf(fp,"\tLDR\tR%d,[R%d,#%d]\n",destreg,destreg,loc);
+			return destreg;
 		}
 		else if(node->ttype==NUMHEX){
 			long n = strtol(node->lexame,NULL,10);
-			if(!isinconstarr(n))
+			if(!(loc=findconstloc(n)*4)){
 				g_array_append_val(constarr,n);
+				loc = (constarr->len-1)*4;
+			}
+			else{
+				
+			}
+			destreg = findfreereg();
+			//Check if cannot alloc?
+			fprintf(fp,"\tLDR\tR%d,=const\n",destreg);
+			fprintf(fp,"\tLDR\tR%d,[R%d,#%d]\n",destreg,destreg,loc);
+			return destreg;
+		}
+		else if(node->ttype==NEG){
+			destreg=traversetree(node->right);
+			//Check if cannot alloc?
+			fprintf(fp,"\tMVN\tR%d,R%d\n",destreg,destreg);
+			fprintf(fp,"\tADD\tR%d,R%d,#1\n",destreg,destreg);
+			return destreg;
 		}
 		else{
 		traversetree(node->left);
 		traversetree(node->right);
 		}
 	}
+	return 0;
 }
 
 int digitcol(long num){
@@ -565,12 +647,34 @@ int digitcol(long num){
 	}
 	return returnval;
 }
-int isinconstarr(long n){
+
+int findconstloc(long n){
 	int k;
 	for(k=0;k<constarr->len;k++){
-		if(n == g_array_index(constarr,long,k))return 1;
+		if(n == g_array_index(constarr,long,k))return 4*k;
 	}
 	return 0;
+}
+
+void allocvartoreg(int varid){
+	int k;
+	for(k = 0;k < 13;k++){
+		if(!rst[k]){
+			rst[k] = 1;
+			vst[varid].regid=k;
+			vst[varid].stat=1;
+			break;
+		}
+	}
+}
+
+int findfreereg(){
+	int k;
+	for(k = 0;k < 13;k++){
+		if(!rst[k])
+			return k;
+	}
+	return -1;
 }
 void yyerror(char * str){
 printf("%s\n",str);
@@ -579,6 +683,13 @@ printf("%s\n",str);
 void main(){
 execseq = g_ptr_array_new();
 constarr = g_array_new(FALSE,TRUE,sizeof(long));
+int i;
+for(i=0;i<26;i++){
+	vst[i].regid=-1;
+	vst[i].stat=0;
+	vst[i].stoffset=0;
+}
+	
 yyparse();
 g_ptr_array_free(execseq,TRUE);
 }
