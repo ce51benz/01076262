@@ -125,6 +125,7 @@ input:START MAIN NEWLINE stmts END MAIN
 					fprintf(fp,"\tMOV\tR%d,R%d\n",vst[vid].regid,destreg);
 			
 		//}
+		}
 		else if(ptr->ttype==IF);
 		else;
 	}
@@ -1160,37 +1161,203 @@ int traversetree(NODE *node){
 				return destreg1;
 			}
 			else if(destreg1 == -1){
-				
-				fprintf(fp,"\tPUSH\t{R0}\n");
-				fprintf(fp,"\tSDIV\tR0,R0,R%d\n",destreg2);
-				fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
-				fprintf(fp,"\tMOV\tLR,R0\n");
-				fprintf(fp,"\tPOP\t{R0}\n");
-				fprintf(fp,"\tSUB\tR0,R0,LR\n");
+				if(destreg2 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP]\n");   //destreg1 is R0(free),destreg2 is LR(which is load from st)
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					fprintf(fp,"\tSDIV\tR0,R0,LR\n");
+					fprintf(fp,"\tMUL\tR0,R0,LR\n");
+					fprintf(fp,"\tMOV\tLR,R0\n");
+					fprintf(fp,"\tPOP\t{R0}\n");
+					fprintf(fp,"\tSUB\tR0,R0,LR\n");
+				}
+				else if(destreg2 >= 10){
+					if(curvar==destreg2){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
+						fprintf(fp,"\tMUL\tR0,R0,R10\n");
+						fprintf(fp,"\tMOV\tLR,R0\n");
+						fprintf(fp,"\tPOP\t{R0}\n");
+						fprintf(fp,"\tSUB\tR0,R0,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
+						fprintf(fp,"\tMUL\tR0,R0,R10\n");
+						fprintf(fp,"\tMOV\tLR,R0\n");
+						fprintf(fp,"\tPOP\t{R0}\n");
+						fprintf(fp,"\tSUB\tR0,R0,LR\n");
+						curvar=destreg2;
+					}
+				}
+				else{
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					fprintf(fp,"\tSDIV\tR0,R0,R%d\n",destreg2);
+					fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
+					fprintf(fp,"\tMOV\tLR,R0\n");
+					fprintf(fp,"\tPOP\t{R0}\n");
+					fprintf(fp,"\tSUB\tR0,R0,LR\n");
+				}
 				return destreg1;
 			}
 			else if(destreg2 == -1){
-				fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
-				fprintf(fp,"\tSDIV\tR%d,R%d,R0\n",destreg1,destreg1);
-				fprintf(fp,"\tMUL\tR0,R%d,R0\n",destreg1);
-				fprintf(fp,"\tMOV\tLR,R0\n");
-				fprintf(fp,"\tPOP\t{R%d}\n",destreg1);
-				fprintf(fp,"\tSUB\tR0,R%d,LR\n",destreg1);
+				if(destreg1 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tPUSH\t{LR}\n");
+					fprintf(fp,"\tSDIV\tLR,LR,R0\n");
+					fprintf(fp,"\tMUL\tR0,LR,R0\n");
+					fprintf(fp,"\tMOV\tLR,R0\n");
+					fprintf(fp,"\tPOP\t{R0}\n");
+					fprintf(fp,"\tSUB\tR0,R0,LR\n");
+				}
+				else if(destreg1 >= 10){
+					if(curvar==destreg1){    //destreg2 is R0(Free),desreg1 is R10
+						fprintf(fp,"\tPUSH\t{R10}\n");
+						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
+						fprintf(fp,"\tMUL\tR0,R10,R0\n");
+						fprintf(fp,"\tMOV\tLR,R0\n");
+						fprintf(fp,"\tPOP\t{R10}\n");
+						fprintf(fp,"\tSUB\tR0,R10,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R10}\n");
+						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
+						fprintf(fp,"\tMUL\tR0,R10,R0\n");
+						fprintf(fp,"\tMOV\tLR,R0\n");
+						fprintf(fp,"\tPOP\t{R10}\n");
+						fprintf(fp,"\tSUB\tR0,R10,LR\n");
+						curvar=destreg1;
+					}
+				}
+				else{
+					fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
+					fprintf(fp,"\tSDIV\tR%d,R%d,R0\n",destreg1,destreg1);
+					fprintf(fp,"\tMUL\tR0,R%d,R0\n",destreg1);
+					fprintf(fp,"\tMOV\tLR,R0\n");
+					fprintf(fp,"\tPOP\t{R%d}\n",destreg1);
+					fprintf(fp,"\tSUB\tR0,R%d,LR\n",destreg1);
+				}
 				return destreg2;
 			}
 			else{
 				//since the both side of addition has valid reg to mod
 				//we cannot mod by accumulate directly(if $B \ $C ???)
-				fprintf(fp,"\tPUSH\t{R0}\n");
+				if(destreg1==0 && destreg2==0){	//$A \ $A = 0
+					fprintf(fp,"\tPUSH\t{R0}\n");  
+					fprintf(fp,"\tMOV\tR0,#0\n");
+				}
+				else if(destreg1==0 && destreg2 < 10){  //destreg1 is R0,destreg2 is R1-R9
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					fprintf(fp,"\tSDIV\tR0,R0,R%d\n",destreg2);
+					fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
+					fprintf(fp,"\tMOV\tLR,R0\n");
+					fprintf(fp,"\tPOP\t{R0}\n");
+					fprintf(fp,"\tSUB\tR0,R0,LR\n");
+				}
+				else if(destreg1==0){ //destreg2 >= 10
+					if(curvar==destreg2){   //destreg1 is R0,destreg2 is R10
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
+						fprintf(fp,"\tMUL\tR0,R0,R10\n");
+						fprintf(fp,"\tMOV\tLR,R0\n");
+						fprintf(fp,"\tPOP\t{R0}\n");
+						fprintf(fp,"\tSUB\tR0,R0,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
+						fprintf(fp,"\tMUL\tR0,R0,R10\n");
+						fprintf(fp,"\tMOV\tLR,R0\n");
+						fprintf(fp,"\tPOP\t{R0}\n");
+						fprintf(fp,"\tSUB\tR0,R0,LR\n");
+						curvar=destreg2;					
+					}
+				}
+				else if(destreg2==0 && destreg1 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
+					fprintf(fp,"\tSDIV\tR%d,R%d,R0\n",destreg1,destreg1);
+					fprintf(fp,"\tMUL\tR%d,R%d,R0\n",destreg1,destreg1);
+					fprintf(fp,"\tMOV\tLR,R%d\n",destreg1);
+					fprintf(fp,"\tPOP\t{R%d}\n",destreg1);
+					fprintf(fp,"\tSUB\tR0,R%d,LR\n",destreg1);
+				}
+				else if(destreg2==0){ //destreg1 >= 10
+					if(curvar==destreg1){   //destreg1 is R10,destreg2 is R0
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tPUSH\t{R10}\n");
+						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
+						fprintf(fp,"\tMUL\tR10,R10,R0\n");
+						fprintf(fp,"\tMOV\tLR,R10\n");
+						fprintf(fp,"\tPOP\t{R10}\n");
+						fprintf(fp,"\tSUB\tR0,R10,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tPUSH\t{R10}\n");
+						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
+						fprintf(fp,"\tMUL\tR10,R10,R0\n");
+						fprintf(fp,"\tMOV\tLR,R10\n");
+						fprintf(fp,"\tPOP\t{R10}\n");
+						fprintf(fp,"\tSUB\tR0,R10,LR\n");
+						curvar=destreg1;						
+					}
+				}
+				else if(destreg1 >= 10 && destreg2 >= 10){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg1){  //destreg 1 is R10,destreg2 is LR
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tPUSH\t{R10}\n");
+						fprintf(fp,"\tSDIV\tR10,R10,LR\n");
+						fprintf(fp,"\tMUL\tR10,R10,LR\n");
+						fprintf(fp,"\tMOV\tLR,R10\n");
+						fprintf(fp,"\tPOP\t{R10}\n");
+						fprintf(fp,"\tSUB\tR0,R10,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						fprintf(fp,"\tPUSH\t{R10}\n");
+						fprintf(fp,"\tSDIV\tR10,R10,LR\n");
+						fprintf(fp,"\tMUL\tR10,R10,LR\n");
+						fprintf(fp,"\tMOV\tLR,R10\n");
+						fprintf(fp,"\tPOP\t{R10}\n");
+						fprintf(fp,"\tSUB\tR0,R10,LR\n");
+						curvar=destreg1;						
+					}
+				}
+				else{
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
+					fprintf(fp,"\tSDIV\tR0,R%d,R%d\n",destreg1,destreg2);
+					fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
+					fprintf(fp,"\tMOV\tLR,R0\n");
+					fprintf(fp,"\tPOP\t{R0}\n");
+					fprintf(fp,"\tSUB\tR0,R0,LR\n");
+				}
+				return -1;
+				//================================================
+				/*fprintf(fp,"\tPUSH\t{R0}\n");
 
 				fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
 				fprintf(fp,"\tSDIV\tR0,R%d,R%d\n",destreg1,destreg2);
 				fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
 				fprintf(fp,"\tMOV\tLR,R0\n");
 				fprintf(fp,"\tPOP\t{R0}\n");
-				fprintf(fp,"\tSUB\tR0,R0,LR\n");
-				return -1;
-			}		
+				fprintf(fp,"\tSUB\tR0,R0,LR\n");*/
+			}
+
 		}
 		//=====================else if
 		else{
