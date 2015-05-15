@@ -131,7 +131,36 @@ input:START MAIN NEWLINE stmts END MAIN
 		}
 		else{
 			//LOOP const TO const DO NEWLINE stdstmt
+			NODE *equ = ptr->left;
+			NODE *equleft = equ->left;
+			NODE *equright = equ->right;
+			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+			long n = strtol(equleft->lexame,NULL,10);
+			if(!(loc=findconstloc(n)*4)){
+				g_array_append_val(constarr,n);
+				loc = (constarr->len-1)*4;
+			}
+			fprintf(fp,"\tLDR\tR11,=const\n");
+			fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",loc);
 			
+			n = strtol(equright->lexame,NULL,10);
+			if(!(loc=findconstloc(n)*4)){
+				g_array_append_val(constarr,n);
+				loc = (constarr->len-1)*4;
+			}
+			fprintf(fp,"\tLDR\tR12,=const\n");
+			fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",loc);
+			//=========================================
+			fprintf(fp,"loop%d:\n",looplbcnt);
+			fprintf(fp,"\tCMP\tR11,R12\n");
+			fprintf(fp,"\tBGT\texitloop%d\n",looplbcnt);
+			generatestdstmt(ptr->right);
+			fprintf(fp,"\tADD\tR11,R11,#1\n");
+			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);  //*******
+			fprintf(fp,"\tB\tloop%d\n",looplbcnt);
+			fprintf(fp,"exitloop%d:\n",looplbcnt);
+			looplbcnt++;curvar=0;
+			//==========================================
 		}
 	}
 	fprintf(fp,"\tMOV\tR0,#0\n");
