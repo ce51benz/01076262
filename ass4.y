@@ -1494,6 +1494,275 @@ int traversetree(NODE *node){
 			}
 
 		}
+		else if(node->ttype=='&'){
+			//The logical and of both is
+			//AND R1,R2,R1 => OK
+			destreg1 = traversetree(node->left);
+			destreg2 = traversetree(node->right);
+			if(destreg1==-1 && destreg2==-1){
+				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
+				fprintf(fp,"\tAND\tR0,LR,R0\n");
+				return destreg1;
+			}
+			else if(destreg1 == -1){
+				if(destreg2 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tAND\tR0,R0,LR\n");
+				}
+				else if(destreg2 >= 10){
+					if(curvar==destreg2){
+						fprintf(fp,"\tAND\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tAND\tR0,R0,R10\n");
+						curvar=destreg2;
+					}
+				}
+				else
+					fprintf(fp,"\tAND\tR0,R0,R%d\n",destreg2);
+				return destreg1;
+			}
+			else if(destreg2 == -1){
+				if(destreg1 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tAND\tR0,LR,R0\n");
+				}
+				else if(destreg1 >= 10){
+					if(curvar==destreg1){
+						fprintf(fp,"\tAND\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tAND\tR0,R10,R0\n");
+						curvar=destreg1;
+					}
+				}
+				else
+					fprintf(fp,"\tAND\tR0,R%d,R0\n",destreg1);
+				return destreg2;
+			}
+			else{
+				//since the both side of logical and has valid reg to add
+				//we cannot and by accumulate directly(if $B * $C ???)
+				if(destreg1==0 && destreg2==0){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tAND\tR0,R0,R0\n");
+				}
+				else if(destreg1==0 && destreg2 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tAND\tR0,R0,R%d\n",destreg2);
+				}
+				else if(destreg1==0){ //destreg2 >= 10
+					if(curvar==destreg2){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tAND\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tAND\tR0,R0,R10\n");
+						curvar=destreg2;					
+					}
+				}
+				else if(destreg2==0 && destreg1 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tAND\tR0,R%d,R0\n",destreg1);
+				}
+				else if(destreg2==0){ //destreg1 >= 10
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tAND\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tAND\tR0,R10,R0\n");
+						curvar=destreg1;						
+					}
+				}
+				else if(destreg1 >= 10 && destreg2 >= 10){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tAND\tR0,R10,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tAND\tR0,R10,LR\n");
+						curvar=destreg1;						
+					}
+				}
+				else{
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tAND\tR0,R%d,R%d\n",destreg1,destreg2);
+				}
+				return -1;
+			}
+		}
+		else if(node->ttype=='|'){
+			//The logical OR of both is
+			//ORR R1,R2,R1 => OK
+			destreg1 = traversetree(node->left);
+			destreg2 = traversetree(node->right);
+			if(destreg1==-1 && destreg2==-1){
+				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
+				fprintf(fp,"\tORR\tR0,LR,R0\n");
+				return destreg1;
+			}
+			else if(destreg1 == -1){
+				if(destreg2 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tORR\tR0,R0,LR\n");
+				}
+				else if(destreg2 >= 10){
+					if(curvar==destreg2){
+						fprintf(fp,"\tORR\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tORR\tR0,R0,R10\n");
+						curvar=destreg2;
+					}
+				}
+				else
+					fprintf(fp,"\tORR\tR0,R0,R%d\n",destreg2);
+				return destreg1;
+			}
+			else if(destreg2 == -1){
+				if(destreg1 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tORR\tR0,LR,R0\n");
+				}
+				else if(destreg1 >= 10){
+					if(curvar==destreg1){
+						fprintf(fp,"\tORR\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tORR\tR0,R10,R0\n");
+						curvar=destreg1;
+					}
+				}
+				else
+					fprintf(fp,"\tORR\tR0,R%d,R0\n",destreg1);
+				return destreg2;
+			}
+			else{
+				//since the both side of logical OR has valid reg to add
+				//we cannot OR by accumulate directly(if $B * $C ???)
+				if(destreg1==0 && destreg2==0){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tORR\tR0,R0,R0\n");
+				}
+				else if(destreg1==0 && destreg2 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tORR\tR0,R0,R%d\n",destreg2);
+				}
+				else if(destreg1==0){ //destreg2 >= 10
+					if(curvar==destreg2){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tORR\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tORR\tR0,R0,R10\n");
+						curvar=destreg2;					
+					}
+				}
+				else if(destreg2==0 && destreg1 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tORR\tR0,R%d,R0\n",destreg1);
+				}
+				else if(destreg2==0){ //destreg1 >= 10
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tORR\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tORR\tR0,R10,R0\n");
+						curvar=destreg1;						
+					}
+				}
+				else if(destreg1 >= 10 && destreg2 >= 10){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tORR\tR0,R10,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tORR\tR0,R10,LR\n");
+						curvar=destreg1;						
+					}
+				}
+				else{
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tORR\tR0,R%d,R%d\n",destreg1,destreg2);
+				}
+				return -1;
+			}
+		}
+		else if(node->ttype=='~'){
+			destreg1=traversetree(node->right);
+			if(destreg1==-1){
+				fprintf(fp,"\tMVN\tR0,R0\n");
+				return -1;
+			}
+			if(destreg1>=10){
+				if(curvar==destreg1){
+					fprintf(fp,"\tMVN\tR10,R10\n");
+				}
+				else{
+					fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+					fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+					fprintf(fp,"\tMVN\tR10,R10\n");
+					curvar=destreg1;						
+				}
+				return destreg1;
+			}
+			else{
+				fprintf(fp,"\tMVN\tR%d,R%d\n",destreg1,destreg1);
+				return destreg1;
+			}
+		}
 		//=====================else if
 		else{
 		traversetree(node->left);
