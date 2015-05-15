@@ -1763,7 +1763,253 @@ int traversetree(NODE *node){
 				return destreg1;
 			}
 		}
-		//=====================else if
+		else if(node->ttype==SLL){
+			//The shift left of both is
+			//LSL R1,R2,R1 => OK
+			destreg1 = traversetree(node->left);
+			destreg2 = traversetree(node->right);
+			if(destreg1==-1 && destreg2==-1){
+				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
+				fprintf(fp,"\tLSL\tR0,LR,R0\n");
+				return destreg1;
+			}
+			else if(destreg1 == -1){
+				if(destreg2 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tLSL\tR0,R0,LR\n");
+				}
+				else if(destreg2 >= 10){
+					if(curvar==destreg2){
+						fprintf(fp,"\tLSL\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tLSL\tR0,R0,R10\n");
+						curvar=destreg2;
+					}
+				}
+				else
+					fprintf(fp,"\tLSL\tR0,R0,R%d\n",destreg2);
+				return destreg1;
+			}
+			else if(destreg2 == -1){
+				if(destreg1 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tLSL\tR0,LR,R0\n");
+				}
+				else if(destreg1 >= 10){
+					if(curvar==destreg1){
+						fprintf(fp,"\tLSL\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tLSL\tR0,R10,R0\n");
+						curvar=destreg1;
+					}
+				}
+				else
+					fprintf(fp,"\tLSL\tR0,R%d,R0\n",destreg1);
+				return destreg2;
+			}
+			else{
+				//since the both side of shift left has valid reg to add
+				//we cannot shift left by accumulate directly(if $B << $C ???)
+				if(destreg1==0 && destreg2==0){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSL\tR0,R0,R0\n");
+				}
+				else if(destreg1==0 && destreg2 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSL\tR0,R0,R%d\n",destreg2);
+				}
+				else if(destreg1==0){ //destreg2 >= 10
+					if(curvar==destreg2){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSL\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSL\tR0,R0,R10\n");
+						curvar=destreg2;					
+					}
+				}
+				else if(destreg2==0 && destreg1 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSL\tR0,R%d,R0\n",destreg1);
+				}
+				else if(destreg2==0){ //destreg1 >= 10
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSL\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSL\tR0,R10,R0\n");
+						curvar=destreg1;						
+					}
+				}
+				else if(destreg1 >= 10 && destreg2 >= 10){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSL\tR0,R10,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSL\tR0,R10,LR\n");
+						curvar=destreg1;						
+					}
+				}
+				else{
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSL\tR0,R%d,R%d\n",destreg1,destreg2);
+				}
+				return -1;
+			}
+		}
+		else if(node->ttype==SRL){
+			//The logical shift right of both is
+			//LSR R1,R2,R1 => OK
+			destreg1 = traversetree(node->left);
+			destreg2 = traversetree(node->right);
+			if(destreg1==-1 && destreg2==-1){
+				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
+				fprintf(fp,"\tLSR\tR0,LR,R0\n");
+				return destreg1;
+			}
+			else if(destreg1 == -1){
+				if(destreg2 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tLSR\tR0,R0,LR\n");
+				}
+				else if(destreg2 >= 10){
+					if(curvar==destreg2){
+						fprintf(fp,"\tLSR\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tLSR\tR0,R0,R10\n");
+						curvar=destreg2;
+					}
+				}
+				else
+					fprintf(fp,"\tLSR\tR0,R0,R%d\n",destreg2);
+				return destreg1;
+			}
+			else if(destreg2 == -1){
+				if(destreg1 == 0){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
+					fprintf(fp,"\tLSR\tR0,LR,R0\n");
+				}
+				else if(destreg1 >= 10){
+					if(curvar==destreg1){
+						fprintf(fp,"\tLSR\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tLSR\tR0,R10,R0\n");
+						curvar=destreg1;
+					}
+				}
+				else
+					fprintf(fp,"\tLSR\tR0,R%d,R0\n",destreg1);
+				return destreg2;
+			}
+			else{
+				//since the both side of shift right has valid reg to add
+				//we cannot shift right by accumulate directly(if $B >> $C ???)
+				if(destreg1==0 && destreg2==0){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSR\tR0,R0,R0\n");
+				}
+				else if(destreg1==0 && destreg2 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSR\tR0,R0,R%d\n",destreg2);
+				}
+				else if(destreg1==0){ //destreg2 >= 10
+					if(curvar==destreg2){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSR\tR0,R0,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSR\tR0,R0,R10\n");
+						curvar=destreg2;					
+					}
+				}
+				else if(destreg2==0 && destreg1 < 10){
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSR\tR0,R%d,R0\n",destreg1);
+				}
+				else if(destreg2==0){ //destreg1 >= 10
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSR\tR0,R10,R0\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSR\tR0,R10,R0\n");
+						curvar=destreg1;						
+					}
+				}
+				else if(destreg1 >= 10 && destreg2 >= 10){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg1){
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSR\tR0,R10,LR\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
+						fprintf(fp,"\tLSR\tR0,R10,LR\n");
+						curvar=destreg1;						
+					}
+				}
+				else{
+					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
+					fprintf(fp,"\tLSR\tR0,R%d,R%d\n",destreg1,destreg2);
+				}
+				return -1;
+			}
+		}
+		//=====================
 		else{
 		traversetree(node->left);
 		traversetree(node->right);
