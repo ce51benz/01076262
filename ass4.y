@@ -704,7 +704,7 @@ int traversetree(NODE *node){
 				fprintf(fp,"\tLDR\tR0,=const\n");
 				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",loc);
 			
-			return destreg1;
+			return -1;
 		}
 		else if(node->ttype==VAR){
 			//Imply that there's already some value in that variable
