@@ -22,10 +22,9 @@ void generatestdstmt(NODE*);
 GPtrArray *execseq;
 GArray *constarr;
 FILE *fp;
-int rst[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 VARSTAT vst[26];
 long r0stoffset;
-int curvar;
+int curvar,errflag;
 long iflbcnt,looplbcnt;
 %}
 %define api.value.type{long}
@@ -92,6 +91,9 @@ input:START MAIN NEWLINE stmts END MAIN
 						curvar=vid;					
 					}
 				}
+				if(!vst[vid].stat){
+				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+				}
 			}
 			//===============================================
 			if(equright->ttype == NUMDEC || equright->ttype == NUMHEX){
@@ -118,6 +120,9 @@ input:START MAIN NEWLINE stmts END MAIN
 						fprintf(fp,"\tMOV\tR12,R10\n");
 						curvar=vid;					
 					}
+				}
+				if(!vst[vid].stat){
+					printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
 				}
 			}
 			
@@ -445,7 +450,8 @@ input:START MAIN NEWLINE stmts END MAIN
     	fprintf(fp,"\t.byte\t45\n");
 	fclose(fp);
 	//TRY to traverse AST?
-};
+}|START MAIN NEWLINE stmts error{printf("ERROR->Missing END MAIN\n");}
+|error stmts END MAIN{printf("ERROR->Missing START MAIN\n");};
 stmts:stdstmt stmts{g_ptr_array_add(execseq,GUINT_TO_POINTER($1));}|
 	condstmt stmts{g_ptr_array_add(execseq,GUINT_TO_POINTER($1));}|
 	loopstmt stmts{g_ptr_array_add(execseq,GUINT_TO_POINTER($1));}|
@@ -703,6 +709,10 @@ int traversetree(NODE *node){
 			//Imply that there's already some value in that variable
 			//Determine the register which return to expression for continuing calculation
 			int vid = strtol(node->lexame,NULL,10)-1;
+			if(!vst[vid].stat){
+				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+				errflag = 1;
+			}
 			if(vst[vid].regid < 10)
 				return vst[vid].regid;
 			else
@@ -1518,6 +1528,9 @@ void generatestdstmt(NODE* ptr){
 				fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
 				fprintf(fp,"\tBL\tshowbase10\n");
 			}
+			if(!vst[vid].stat){
+				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+			}
 		}
 		else if(ptr->ttype==SHOWBASE16){
 			vid = strtol((ptr->left)->lexame,NULL,10)-1;
@@ -1542,6 +1555,9 @@ void generatestdstmt(NODE* ptr){
 				fprintf(fp,"\tPUSH\t{R12}\n");
 				fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
 				fprintf(fp,"\tBL\tshowbase16\n");
+			}
+			if(!vst[vid].stat){
+				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
 			}
 		}
 		else if(ptr->ttype=='='){
@@ -1605,6 +1621,10 @@ void generatestdstmt(NODE* ptr){
 						}
 					}
 				}
+			if(errflag)
+				errflag=0;
+			else
+				vst[vid].stat = 1;
 		}
 }
 
@@ -1639,11 +1659,13 @@ vst[0].stoffset+=off;
 
 
 void yyerror(char * str){
+if(strcmp(str,"syntax error")) 
 printf("%s\n",str);
 }
 
 void main(){
 iflbcnt=looplbcnt=0;
+errflag=0;
 r0stoffset =-4;
 curvar = 10;
 execseq = g_ptr_array_new();
@@ -1651,12 +1673,12 @@ constarr = g_array_new(FALSE,TRUE,sizeof(long));
 int i;
 for(i=0;i<10;i++){
 	vst[i].regid=i;
-	vst[i].stat=1;
+	vst[i].stat=0;
 	vst[i].stoffset=0;
 }
 for(i=10;i<26;i++){
 	vst[i].regid=10;
-	vst[i].stat=1;
+	vst[i].stat=0;
 	vst[i].stoffset=((i-10)*4)+4;
 }
 	
