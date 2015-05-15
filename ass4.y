@@ -44,7 +44,9 @@ long iflbcnt,looplbcnt;
 %right '~' NEG
 %%
 input:START MAIN NEWLINE stmts END MAIN
-|START MAIN NEWLINE stmts END MAIN NEWLINE{
+{goto warppt;}|START MAIN NEWLINE stmts END MAIN NEWLINE{
+	warppt:
+	curvar=curvar;
 	int k,vid,destreg;
 	long loc;
 	NODE *ptr;

@@ -6,6 +6,9 @@
 %}
 
 %%
+^[#].+[\n]+	{ }
+[#].+[\n]+	{ return NEWLINE;}
+[#].		{ }
 START 		{return START;}
 MAIN 		{return MAIN;}
 END 		{return END;}
