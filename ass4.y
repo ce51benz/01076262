@@ -24,7 +24,7 @@ GArray *constarr;
 FILE *fp;
 VARSTAT vst[26];
 long r0stoffset;
-int curvar,errflag;
+int curvar,errflag,globalerrflag;
 long iflbcnt,looplbcnt;
 %}
 %define api.value.type{long}
@@ -93,6 +93,7 @@ input:START MAIN NEWLINE stmts END MAIN
 				}
 				if(!vst[vid].stat){
 				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+				globalerrflag=1;
 				}
 			}
 			//===============================================
@@ -123,6 +124,7 @@ input:START MAIN NEWLINE stmts END MAIN
 				}
 				if(!vst[vid].stat){
 					printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+					globalerrflag=1;
 				}
 			}
 			
@@ -711,7 +713,7 @@ int traversetree(NODE *node){
 			int vid = strtol(node->lexame,NULL,10)-1;
 			if(!vst[vid].stat){
 				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
-				errflag = 1;
+				globalerrflag = errflag = 1;
 			}
 			if(vst[vid].regid < 10)
 				return vst[vid].regid;
@@ -1530,6 +1532,7 @@ void generatestdstmt(NODE* ptr){
 			}
 			if(!vst[vid].stat){
 				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+				globalerrflag=1;
 			}
 		}
 		else if(ptr->ttype==SHOWBASE16){
@@ -1558,6 +1561,7 @@ void generatestdstmt(NODE* ptr){
 			}
 			if(!vst[vid].stat){
 				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+				globalerrflag=1;
 			}
 		}
 		else if(ptr->ttype=='='){
@@ -1665,6 +1669,7 @@ printf("%s\n",str);
 
 void main(){
 iflbcnt=looplbcnt=0;
+globalerrflag=0;
 errflag=0;
 r0stoffset =-4;
 curvar = 10;
@@ -1683,5 +1688,9 @@ for(i=10;i<26;i++){
 }
 	
 yyparse();
+if(globalerrflag){
+	fp = fopen("output.s","w");
+	fclose(fp);
+}
 g_ptr_array_free(execseq,TRUE);
 }
