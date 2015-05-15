@@ -18,6 +18,7 @@ typedef struct _varstat{
 int traversetree(NODE *);
 int findconstloc(long);
 void changestoffset(int);
+void generatestdstmt(NODE*);
 GPtrArray *execseq;
 GArray *constarr;
 FILE *fp;
@@ -25,6 +26,7 @@ int rst[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 VARSTAT vst[26];
 long r0stoffset;
 int curvar;
+long iflbcnt;
 %}
 %define api.value.type{long}
 
@@ -45,129 +47,87 @@ int curvar;
 input:START MAIN NEWLINE stmts END MAIN
 |START MAIN NEWLINE stmts END MAIN NEWLINE{
 	int k,vid,destreg;
+	long loc;
 	NODE *ptr;
 	fp = fopen("output.s","w");
 	fprintf(fp,".text\n");
 	fprintf(fp,".align 2\n");
 	fprintf(fp,".global _start\n");
 	fprintf(fp,"_start:\n");
-	fprintf(fp,"\tSUB\tSP,SP,#64\n");
+	fprintf(fp,"\tSUB\tSP,SP,#68\n");
 	for(k=execseq->len-1;k>=0;k--){
 		ptr = g_ptr_array_index(execseq,k);
-		g_printf("%s\n",ptr->lexame);
-		if(ptr->ttype==SHOWBASE10){
-			vid = strtol((ptr->left)->lexame,NULL,10)-1;
-			//Imply that the var is already assign some value.
-			//IF value of var is not in reg?? find from stack!?
-			if(vid>=10){
-				if(curvar==vid){
-					fprintf(fp,"\tPUSH\t{R12}\n");
-					fprintf(fp,"\tMOV\tR12,R10\n");
-					fprintf(fp,"\tBL\tshowbase10\n");
+		//=======================================================
+		if(ptr->ttype==SHOWBASE10 || ptr->ttype==SHOWBASE16 ||ptr->ttype=='=')
+			generatestdstmt(ptr);
+		//===============================================================
+		else if(ptr->ttype==IF){
+			//IF varconst EQUTO varconst THEN NEWLINE stdstmt
+			NODE *equ = ptr->left;
+			NODE *equleft = equ->left;
+			NODE *equright = equ->right;
+			if(equleft->ttype == NUMDEC || equleft->ttype == NUMHEX){
+				long n = strtol(equleft->lexame,NULL,10);
+				if(!(loc=findconstloc(n)*4)){
+					g_array_append_val(constarr,n);
+					loc = (constarr->len-1)*4;
+				}
+				fprintf(fp,"\tLDR\tR11,=const\n");
+				fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",loc);
+			}
+			else{ //equleft is VAR
+				vid = strtol(equleft->lexame,NULL,10)-1;
+				if(vid<10){
+					fprintf(fp,"\tMOV\tR11,R%d\n",vid);
 				}
 				else{
-					fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
-					fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
-					fprintf(fp,"\tPUSH\t{R12}\n");
-					fprintf(fp,"\tMOV\tR12,R10\n");
-					fprintf(fp,"\tBL\tshowbase10\n");
-					curvar=vid;
+					if(curvar==vid){
+						fprintf(fp,"\tMOV\tR11,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+						fprintf(fp,"\tMOV\tR11,R10\n");
+						curvar=vid;					
+					}
 				}
 			}
-			else{
-				fprintf(fp,"\tPUSH\t{R12}\n");
-				fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
-				fprintf(fp,"\tBL\tshowbase10\n");
+			//===============================================
+			if(equright->ttype == NUMDEC || equright->ttype == NUMHEX){
+				long n = strtol(equright->lexame,NULL,10);
+				if(!(loc=findconstloc(n)*4)){
+					g_array_append_val(constarr,n);
+					loc = (constarr->len-1)*4;
+				}
+				fprintf(fp,"\tLDR\tR12,=const\n");
+				fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",loc);
 			}
-		}
-		else if(ptr->ttype==SHOWBASE16){
-			vid = strtol((ptr->left)->lexame,NULL,10)-1;
-			//Imply that the var is already assign some value.
-			//IF value of var is not in reg?? find from stack!?
-			if(vid>=10){
-				if(curvar==vid){
-					fprintf(fp,"\tPUSH\t{R12}\n");
-					fprintf(fp,"\tMOV\tR12,R10\n");
-					fprintf(fp,"\tBL\tshowbase16\n");
+			else{ //equright is VAR
+				vid = strtol(equright->lexame,NULL,10)-1;
+				if(vid<10){
+					fprintf(fp,"\tMOV\tR12,R%d\n",vid);
 				}
 				else{
-					fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
-					fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
-					fprintf(fp,"\tPUSH\t{R12}\n");
-					fprintf(fp,"\tMOV\tR12,R10\n");
-					fprintf(fp,"\tBL\tshowbase16\n");
-					curvar=vid;
+					if(curvar==vid){
+						fprintf(fp,"\tMOV\tR12,R10\n");
+					}
+					else{
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+						fprintf(fp,"\tMOV\tR12,R10\n");
+						curvar=vid;					
+					}
 				}
 			}
-			else{
-				fprintf(fp,"\tPUSH\t{R12}\n");
-				fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
-				fprintf(fp,"\tBL\tshowbase16\n");
-			}
+			
+			fprintf(fp,"\tCMP\tR11,R12\n");
+			fprintf(fp,"\tBNE\twarpif%d\n",iflbcnt);
+			generatestdstmt(ptr->right);
+			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+			curvar=0;
+			fprintf(fp,"warpif%d:\n",iflbcnt);
+			iflbcnt++;
 		}
-		else if(ptr->ttype=='='){
-			vid = strtol((ptr->left)->lexame,NULL,10)-1;
-				destreg = traversetree(ptr->right);
-				if(destreg==-1){
-					if(vid<10){
-						fprintf(fp,"\tMOV\tR%d,R0\n",vst[vid].regid);
-						if(vst[vid].regid==0){
-							fprintf(fp,"\tPOP\t{LR}\n");
-						}
-						else{
-							fprintf(fp,"\tPOP\t{R0}\n");
-						}
-					}
-					else{
-						if(curvar==vid){
-							fprintf(fp,"\tMOV\tR10,R0\n");
-							fprintf(fp,"\tPOP\t{R0}\n");
-						}
-						else{
-							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
-							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
-							fprintf(fp,"\tMOV\tR10,R0\n");
-							fprintf(fp,"\tPOP\t{R0}\n");
-							curvar=vid;					
-						}
-					}
-					changestoffset(-4);
-				}
-				else if(destreg>=10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg].stoffset); //LDR value of RXX to LR
-					if(vid<10){
-						fprintf(fp,"\tMOV\tR%d,LR\n",vst[vid].regid);
-					}
-					else{
-						if(curvar==vid){
-							fprintf(fp,"\tMOV\tR10,LR\n");
-						}
-						else{
-							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
-							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
-							fprintf(fp,"\tMOV\tR10,LR\n");
-							curvar=vid;					
-						}
-					}
-				}
-				else{ 	//======== destreg < 10
-					if(vid<10){
-						fprintf(fp,"\tMOV\tR%d,R%d\n",vst[vid].regid,destreg);
-					}
-					else{
-						if(curvar==vid){
-							fprintf(fp,"\tMOV\tR10,R%d\n",destreg);
-						}
-						else{
-							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
-							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
-							fprintf(fp,"\tMOV\tR10,R%d\n",destreg);
-							curvar=vid;					
-						}
-					}
-				}
-		}
-		else if(ptr->ttype==IF);
 		else;
 	}
 	fprintf(fp,"\tMOV\tR0,#0\n");
@@ -1499,6 +1459,125 @@ int traversetree(NODE *node){
 	return 0;
 }
 
+void generatestdstmt(NODE* ptr){
+	int vid,destreg;
+	if(ptr->ttype==SHOWBASE10){
+			vid = strtol((ptr->left)->lexame,NULL,10)-1;
+			//Imply that the var is already assign some value.
+			//IF value of var is not in reg?? find from stack!?
+			if(vid>=10){
+				if(curvar==vid){
+					fprintf(fp,"\tPUSH\t{R12}\n");
+					fprintf(fp,"\tMOV\tR12,R10\n");
+					fprintf(fp,"\tBL\tshowbase10\n");
+				}
+				else{
+					fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+					fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+					fprintf(fp,"\tPUSH\t{R12}\n");
+					fprintf(fp,"\tMOV\tR12,R10\n");
+					fprintf(fp,"\tBL\tshowbase10\n");
+					curvar=vid;
+				}
+			}
+			else{
+				fprintf(fp,"\tPUSH\t{R12}\n");
+				fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
+				fprintf(fp,"\tBL\tshowbase10\n");
+			}
+		}
+		else if(ptr->ttype==SHOWBASE16){
+			vid = strtol((ptr->left)->lexame,NULL,10)-1;
+			//Imply that the var is already assign some value.
+			//IF value of var is not in reg?? find from stack!?
+			if(vid>=10){
+				if(curvar==vid){
+					fprintf(fp,"\tPUSH\t{R12}\n");
+					fprintf(fp,"\tMOV\tR12,R10\n");
+					fprintf(fp,"\tBL\tshowbase16\n");
+				}
+				else{
+					fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+					fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+					fprintf(fp,"\tPUSH\t{R12}\n");
+					fprintf(fp,"\tMOV\tR12,R10\n");
+					fprintf(fp,"\tBL\tshowbase16\n");
+					curvar=vid;
+				}
+			}
+			else{
+				fprintf(fp,"\tPUSH\t{R12}\n");
+				fprintf(fp,"\tMOV\tR12,R%d\n",vst[vid].regid);
+				fprintf(fp,"\tBL\tshowbase16\n");
+			}
+		}
+		else if(ptr->ttype=='='){
+			vid = strtol((ptr->left)->lexame,NULL,10)-1;
+				destreg = traversetree(ptr->right);
+				if(destreg==-1){
+					if(vid<10){
+						fprintf(fp,"\tMOV\tR%d,R0\n",vst[vid].regid);
+						if(vst[vid].regid==0){
+							fprintf(fp,"\tPOP\t{LR}\n");
+						}
+						else{
+							fprintf(fp,"\tPOP\t{R0}\n");
+						}
+					}
+					else{
+						if(curvar==vid){
+							fprintf(fp,"\tMOV\tR10,R0\n");
+							fprintf(fp,"\tPOP\t{R0}\n");
+						}
+						else{
+							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+							fprintf(fp,"\tMOV\tR10,R0\n");
+							fprintf(fp,"\tPOP\t{R0}\n");
+							curvar=vid;					
+						}
+					}
+					changestoffset(-4);
+				}
+				else if(destreg>=10){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg].stoffset); //LDR value of RXX to LR
+					if(vid<10){
+						fprintf(fp,"\tMOV\tR%d,LR\n",vst[vid].regid);
+					}
+					else{
+						if(curvar==vid){
+							fprintf(fp,"\tMOV\tR10,LR\n");
+						}
+						else{
+							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+							fprintf(fp,"\tMOV\tR10,LR\n");
+							curvar=vid;					
+						}
+					}
+				}
+				else{ 	//======== destreg < 10
+					if(vid<10){
+						fprintf(fp,"\tMOV\tR%d,R%d\n",vst[vid].regid,destreg);
+					}
+					else{
+						if(curvar==vid){
+							fprintf(fp,"\tMOV\tR10,R%d\n",destreg);
+						}
+						else{
+							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+							fprintf(fp,"\tMOV\tR10,R%d\n",destreg);
+							curvar=vid;					
+						}
+					}
+				}
+		}
+}
+
+
+
+
 int digitcol(long num){
 	int returnval = 1;
 	while(num > 10){
@@ -1522,6 +1601,7 @@ int i;
 	vst[i].stoffset+=off;
 }
 r0stoffset+=off;
+vst[0].stoffset+=off;
 }
 
 
@@ -1530,6 +1610,7 @@ printf("%s\n",str);
 }
 
 void main(){
+iflbcnt=0;
 r0stoffset =-4;
 curvar = 10;
 execseq = g_ptr_array_new();
@@ -1540,11 +1621,10 @@ for(i=0;i<10;i++){
 	vst[i].stat=1;
 	vst[i].stoffset=0;
 }
-
 for(i=10;i<26;i++){
 	vst[i].regid=10;
 	vst[i].stat=1;
-	vst[i].stoffset=(i-10)*4;
+	vst[i].stoffset=((i-10)*4)+4;
 }
 	
 yyparse();
