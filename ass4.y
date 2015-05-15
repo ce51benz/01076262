@@ -26,7 +26,7 @@ int rst[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 VARSTAT vst[26];
 long r0stoffset;
 int curvar;
-long iflbcnt;
+long iflbcnt,looplbcnt;
 %}
 %define api.value.type{long}
 
@@ -66,6 +66,7 @@ input:START MAIN NEWLINE stmts END MAIN
 			NODE *equ = ptr->left;
 			NODE *equleft = equ->left;
 			NODE *equright = equ->right;
+			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 			if(equleft->ttype == NUMDEC || equleft->ttype == NUMHEX){
 				long n = strtol(equleft->lexame,NULL,10);
 				if(!(loc=findconstloc(n)*4)){
@@ -128,7 +129,10 @@ input:START MAIN NEWLINE stmts END MAIN
 			fprintf(fp,"warpif%d:\n",iflbcnt);
 			iflbcnt++;
 		}
-		else;
+		else{
+			//LOOP const TO const DO NEWLINE stdstmt
+			
+		}
 	}
 	fprintf(fp,"\tMOV\tR0,#0\n");
     	fprintf(fp,"\tMOV\tR7,#1\n");
@@ -1610,7 +1614,7 @@ printf("%s\n",str);
 }
 
 void main(){
-iflbcnt=0;
+iflbcnt=looplbcnt=0;
 r0stoffset =-4;
 curvar = 10;
 execseq = g_ptr_array_new();
