@@ -17,12 +17,13 @@ typedef struct _varstat{
 }VARSTAT;
 int traversetree(NODE *);
 int findconstloc(long);
+void changestoffset(int);
 GPtrArray *execseq;
 GArray *constarr;
 FILE *fp;
 int rst[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 VARSTAT vst[26];
-long stpushcnt;
+long r0stoffset;
 int curvar;
 %}
 %define api.value.type{long}
@@ -106,25 +107,65 @@ input:START MAIN NEWLINE stmts END MAIN
 		}
 		else if(ptr->ttype=='='){
 			vid = strtol((ptr->left)->lexame,NULL,10)-1;
-			/*if(vst[vid].stat){
-				traversetree(ptr->right);
-			}*/
-			//else{
 				destreg = traversetree(ptr->right);
 				if(destreg==-1){
-					
-					fprintf(fp,"\tMOV\tR%d,R0\n",vst[vid].regid);
-					if(vst[vid].regid==0){
-						fprintf(fp,"\tPOP\t{LR}\n",vst[vid].regid);
+					if(vid<10){
+						fprintf(fp,"\tMOV\tR%d,R0\n",vst[vid].regid);
+						if(vst[vid].regid==0){
+							fprintf(fp,"\tPOP\t{LR}\n");
+						}
+						else{
+							fprintf(fp,"\tPOP\t{R0}\n");
+						}
 					}
 					else{
-						fprintf(fp,"\tPOP\t{R0}\n",vst[vid].regid);
+						if(curvar==vid){
+							fprintf(fp,"\tMOV\tR10,R0\n");
+							fprintf(fp,"\tPOP\t{R0}\n");
+						}
+						else{
+							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+							fprintf(fp,"\tMOV\tR10,R0\n");
+							fprintf(fp,"\tPOP\t{R0}\n");
+							curvar=vid;					
+						}
+					}
+					changestoffset(-4);
+				}
+				else if(destreg>=10){
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg].stoffset); //LDR value of RXX to LR
+					if(vid<10){
+						fprintf(fp,"\tMOV\tR%d,LR\n",vst[vid].regid);
+					}
+					else{
+						if(curvar==vid){
+							fprintf(fp,"\tMOV\tR10,LR\n");
+						}
+						else{
+							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+							fprintf(fp,"\tMOV\tR10,LR\n");
+							curvar=vid;					
+						}
 					}
 				}
-				else
-					fprintf(fp,"\tMOV\tR%d,R%d\n",vst[vid].regid,destreg);
-			
-		//}
+				else{ 	//======== destreg < 10
+					if(vid<10){
+						fprintf(fp,"\tMOV\tR%d,R%d\n",vst[vid].regid,destreg);
+					}
+					else{
+						if(curvar==vid){
+							fprintf(fp,"\tMOV\tR10,R%d\n",destreg);
+						}
+						else{
+							fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+							fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+							fprintf(fp,"\tMOV\tR10,R%d\n",destreg);
+							curvar=vid;					
+						}
+					}
+				}
 		}
 		else if(ptr->ttype==IF);
 		else;
@@ -646,12 +687,8 @@ int traversetree(NODE *node){
 				g_array_append_val(constarr,n);
 				loc = (constarr->len-1)*4;
 			}
-			else{
-				
-			}
-			//Check if cannot alloc?
-			//if(destreg1==-1){
 				fprintf(fp,"\tPUSH\t{R0}\n");
+				changestoffset(4);
 				fprintf(fp,"\tLDR\tR0,=const\n");
 				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",loc);
 			return -1;
@@ -662,11 +699,8 @@ int traversetree(NODE *node){
 				g_array_append_val(constarr,n);
 				loc = (constarr->len-1)*4;
 			}
-			else{
-				
-			}
-			//Check if cannot alloc?
 				fprintf(fp,"\tPUSH\t{R0}\n");
+				changestoffset(4);
 				fprintf(fp,"\tLDR\tR0,=const\n");
 				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",loc);
 			
@@ -687,13 +721,27 @@ int traversetree(NODE *node){
 			if(destreg1==-1){
 				fprintf(fp,"\tMVN\tR0,R0\n");
 				fprintf(fp,"\tADD\tR0,R0,#1\n");
+				return -1;
+			}
+			if(destreg1>=10){
+				if(curvar==destreg1){
+					fprintf(fp,"\tMVN\tR10,R10\n");
+					fprintf(fp,"\tADD\tR10,R10,#1\n");
+				}
+				else{
+					fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+					fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
+					fprintf(fp,"\tMVN\tR10,R10\n");
+					fprintf(fp,"\tADD\tR10,R10,#1\n");
+					curvar=destreg1;						
+				}
+				return destreg1;
 			}
 			else{
 				fprintf(fp,"\tMVN\tR%d,R%d\n",destreg1,destreg1);
 				fprintf(fp,"\tADD\tR%d,R%d,#1\n",destreg1,destreg1);
+				return destreg1;
 			}
-
-			return destreg1;
 		}
 		else if(node->ttype=='+'){
 			//The addition of both is
@@ -702,12 +750,13 @@ int traversetree(NODE *node){
 			destreg2 = traversetree(node->right);
 			if(destreg1==-1 && destreg2==-1){
 				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
 				fprintf(fp,"\tADD\tR0,LR,R0\n");
 				return destreg1;
 			}
 			else if(destreg1 == -1){
 				if(destreg2 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tADD\tR0,R0,LR\n");
 				}
 				else if(destreg2 >= 10){
@@ -727,7 +776,7 @@ int traversetree(NODE *node){
 			}
 			else if(destreg2 == -1){
 				if(destreg1 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tADD\tR0,LR,R0\n");
 				}
 				else if(destreg1 >= 10){
@@ -750,38 +799,45 @@ int traversetree(NODE *node){
 				//we cannot add by accumulate directly(if $B + $C ???)
 				if(destreg1==0 && destreg2==0){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tADD\tR0,R0,R0\n");
 				}
 				else if(destreg1==0 && destreg2 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tADD\tR0,R0,R%d\n",destreg2);
 				}
 				else if(destreg1==0){ //destreg2 >= 10
 					if(curvar==destreg2){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tADD\tR0,R0,R10\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tADD\tR0,R0,R10\n");
 						curvar=destreg2;					
 					}
 				}
 				else if(destreg2==0 && destreg1 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tADD\tR0,R%d,R0\n",destreg1);
 				}
 				else if(destreg2==0){ //destreg1 >= 10
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tADD\tR0,R10,R0\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tADD\tR0,R10,R0\n");
 						curvar=destreg1;						
 					}
@@ -790,18 +846,21 @@ int traversetree(NODE *node){
 					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tADD\tR0,R10,LR\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tADD\tR0,R10,LR\n");
 						curvar=destreg1;						
 					}
 				}
 				else{
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tADD\tR0,R%d,R%d\n",destreg1,destreg2);
 				}
 				return -1;
@@ -814,12 +873,13 @@ int traversetree(NODE *node){
 			destreg2 = traversetree(node->right);
 			if(destreg1==-1 && destreg2==-1){
 				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
 				fprintf(fp,"\tSUB\tR0,LR,R0\n");
 				return destreg1;
 			}
 			else if(destreg1 == -1){
 				if(destreg2 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tSUB\tR0,R0,LR\n");
 				}
 				else if(destreg2 >= 10){
@@ -839,7 +899,7 @@ int traversetree(NODE *node){
 			}
 			else if(destreg2 == -1){
 				if(destreg1 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tSUB\tR0,LR,R0\n");
 				}
 				else if(destreg1 >= 10){
@@ -862,38 +922,45 @@ int traversetree(NODE *node){
 				//we cannot subtract by accumulate directly(if $B - $C ???)
 				if(destreg1==0 && destreg2==0){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSUB\tR0,R0,R0\n");
 				}
 				else if(destreg1==0 && destreg2 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSUB\tR0,R0,R%d\n",destreg2);
 				}
 				else if(destreg1==0){ //destreg2 >= 10
 					if(curvar==destreg2){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSUB\tR0,R0,R10\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSUB\tR0,R0,R10\n");
 						curvar=destreg2;					
 					}
 				}
 				else if(destreg2==0 && destreg1 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSUB\tR0,R%d,R0\n",destreg1);
 				}
 				else if(destreg2==0){ //destreg1 >= 10
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSUB\tR0,R10,R0\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSUB\tR0,R10,R0\n");
 						curvar=destreg1;						
 					}
@@ -902,18 +969,21 @@ int traversetree(NODE *node){
 					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 						curvar=destreg1;						
 					}
 				}
 				else{
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSUB\tR0,R%d,R%d\n",destreg1,destreg2);
 				}
 				return -1;
@@ -926,12 +996,13 @@ int traversetree(NODE *node){
 			destreg2 = traversetree(node->right);
 			if(destreg1==-1 && destreg2==-1){
 				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
 				fprintf(fp,"\tMUL\tR0,LR,R0\n");
 				return destreg1;
 			}
 			else if(destreg1 == -1){
 				if(destreg2 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tMUL\tR0,R0,LR\n");
 				}
 				else if(destreg2 >= 10){
@@ -951,7 +1022,7 @@ int traversetree(NODE *node){
 			}
 			else if(destreg2 == -1){
 				if(destreg1 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tMUL\tR0,LR,R0\n");
 				}
 				else if(destreg1 >= 10){
@@ -974,38 +1045,45 @@ int traversetree(NODE *node){
 				//we cannot multiply by accumulate directly(if $B * $C ???)
 				if(destreg1==0 && destreg2==0){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tMUL\tR0,R0,R0\n");
 				}
 				else if(destreg1==0 && destreg2 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
 				}
 				else if(destreg1==0){ //destreg2 >= 10
 					if(curvar==destreg2){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tMUL\tR0,R0,R10\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tMUL\tR0,R0,R10\n");
 						curvar=destreg2;					
 					}
 				}
 				else if(destreg2==0 && destreg1 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tMUL\tR0,R%d,R0\n",destreg1);
 				}
 				else if(destreg2==0){ //destreg1 >= 10
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tMUL\tR0,R10,R0\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tMUL\tR0,R10,R0\n");
 						curvar=destreg1;						
 					}
@@ -1014,18 +1092,21 @@ int traversetree(NODE *node){
 					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tMUL\tR0,R10,LR\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tMUL\tR0,R10,LR\n");
 						curvar=destreg1;						
 					}
 				}
 				else{
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tMUL\tR0,R%d,R%d\n",destreg1,destreg2);
 				}
 				return -1;
@@ -1038,12 +1119,13 @@ int traversetree(NODE *node){
 			destreg2 = traversetree(node->right);
 			if(destreg1==-1 && destreg2==-1){
 				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
 				fprintf(fp,"\tSDIV\tR0,LR,R0\n");
 				return destreg1;
 			}
 			else if(destreg1 == -1){
 				if(destreg2 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tSDIV\tR0,R0,LR\n");
 				}
 				else if(destreg2 >= 10){
@@ -1063,7 +1145,7 @@ int traversetree(NODE *node){
 			}
 			else if(destreg2 == -1){
 				if(destreg1 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tSDIV\tR0,LR,R0\n");
 				}
 				else if(destreg1 >= 10){
@@ -1086,38 +1168,45 @@ int traversetree(NODE *node){
 				//we cannot div by accumulate directly(if $B / $C ???)
 				if(destreg1==0 && destreg2==0){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tR0,R0,R0\n");
 				}
 				else if(destreg1==0 && destreg2 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tR0,R0,R%d\n",destreg2);
 				}
 				else if(destreg1==0){ //destreg2 >= 10
 					if(curvar==destreg2){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
 						curvar=destreg2;					
 					}
 				}
 				else if(destreg2==0 && destreg1 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tR0,R%d,R0\n",destreg1);
 				}
 				else if(destreg2==0){ //destreg1 >= 10
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R10,R0\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R10,R0\n");
 						curvar=destreg1;						
 					}
@@ -1126,18 +1215,21 @@ int traversetree(NODE *node){
 					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R10,LR\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R10,LR\n");
 						curvar=destreg1;						
 					}
 				}
 				else{
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tR0,R%d,R%d\n",destreg1,destreg2);
 				}
 				return -1;
@@ -1152,92 +1244,111 @@ int traversetree(NODE *node){
 			destreg2 = traversetree(node->right);
 			if(destreg1==-1 && destreg2==-1){
 				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
 				fprintf(fp,"\tPUSH\t{LR}\n");
+				changestoffset(4);
 				fprintf(fp,"\tSDIV\tLR,LR,R0\n");
 				fprintf(fp,"\tMUL\tLR,LR,R0\n");
 				fprintf(fp,"\tMOV\tR0,LR\n");
 				fprintf(fp,"\tPOP\t{LR}\n");
+				changestoffset(-4);
 				fprintf(fp,"\tSUB\tR0,LR,R0\n");
 				return destreg1;
 			}
 			else if(destreg1 == -1){
 				if(destreg2 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");   //destreg1 is R0(free),destreg2 is LR(which is load from st)
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);   //destreg1 is R0(free),destreg2 is LR(which is load from st)
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tR0,R0,LR\n");
 					fprintf(fp,"\tMUL\tR0,R0,LR\n");
 					fprintf(fp,"\tMOV\tLR,R0\n");
 					fprintf(fp,"\tPOP\t{R0}\n");
+					changestoffset(-4);
 					fprintf(fp,"\tSUB\tR0,R0,LR\n");
 				}
 				else if(destreg2 >= 10){
 					if(curvar==destreg2){
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
 						fprintf(fp,"\tMUL\tR0,R0,R10\n");
 						fprintf(fp,"\tMOV\tLR,R0\n");
 						fprintf(fp,"\tPOP\t{R0}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R0,LR\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
 						fprintf(fp,"\tMUL\tR0,R0,R10\n");
 						fprintf(fp,"\tMOV\tLR,R0\n");
 						fprintf(fp,"\tPOP\t{R0}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R0,LR\n");
 						curvar=destreg2;
 					}
 				}
 				else{
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tR0,R0,R%d\n",destreg2);
 					fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
 					fprintf(fp,"\tMOV\tLR,R0\n");
 					fprintf(fp,"\tPOP\t{R0}\n");
+					changestoffset(-4);
 					fprintf(fp,"\tSUB\tR0,R0,LR\n");
 				}
 				return destreg1;
 			}
 			else if(destreg2 == -1){
 				if(destreg1 == 0){
-					fprintf(fp,"\tLDR\tLR,[SP]\n");
+					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tPUSH\t{LR}\n");
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tLR,LR,R0\n");
 					fprintf(fp,"\tMUL\tR0,LR,R0\n");
 					fprintf(fp,"\tMOV\tLR,R0\n");
 					fprintf(fp,"\tPOP\t{R0}\n");
+					changestoffset(-4);
 					fprintf(fp,"\tSUB\tR0,R0,LR\n");
 				}
 				else if(destreg1 >= 10){
 					if(curvar==destreg1){    //destreg2 is R0(Free),desreg1 is R10
 						fprintf(fp,"\tPUSH\t{R10}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
 						fprintf(fp,"\tMUL\tR0,R10,R0\n");
 						fprintf(fp,"\tMOV\tLR,R0\n");
 						fprintf(fp,"\tPOP\t{R10}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 					}
 					else{
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R10}\n");
+						changestoffset(4);
 						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
 						fprintf(fp,"\tMUL\tR0,R10,R0\n");
 						fprintf(fp,"\tMOV\tLR,R0\n");
 						fprintf(fp,"\tPOP\t{R10}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 						curvar=destreg1;
 					}
 				}
 				else{
 					fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
+					changestoffset(4);
 					fprintf(fp,"\tSDIV\tR%d,R%d,R0\n",destreg1,destreg1);
 					fprintf(fp,"\tMUL\tR0,R%d,R0\n",destreg1);
 					fprintf(fp,"\tMOV\tLR,R0\n");
 					fprintf(fp,"\tPOP\t{R%d}\n",destreg1);
+					changestoffset(-4);
 					fprintf(fp,"\tSUB\tR0,R%d,LR\n",destreg1);
 				}
 				return destreg2;
@@ -1247,25 +1358,30 @@ int traversetree(NODE *node){
 				//we cannot mod by accumulate directly(if $B \ $C ???)
 				if(destreg1==0 && destreg2==0){	//$A \ $A = 0
 					fprintf(fp,"\tPUSH\t{R0}\n");  
+					changestoffset(4);
 					fprintf(fp,"\tMOV\tR0,#0\n");
 				}
 				else if(destreg1==0 && destreg2 < 10){  //destreg1 is R0,destreg2 is R1-R9
 					fprintf(fp,"\tPUSH\t{R0}\n");
 					fprintf(fp,"\tPUSH\t{R0}\n");
+					changestoffset(8);
 					fprintf(fp,"\tSDIV\tR0,R0,R%d\n",destreg2);
 					fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
 					fprintf(fp,"\tMOV\tLR,R0\n");
 					fprintf(fp,"\tPOP\t{R0}\n");
+					changestoffset(-4);
 					fprintf(fp,"\tSUB\tR0,R0,LR\n");
 				}
 				else if(destreg1==0){ //destreg2 >= 10
 					if(curvar==destreg2){   //destreg1 is R0,destreg2 is R10
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(8);
 						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
 						fprintf(fp,"\tMUL\tR0,R0,R10\n");
 						fprintf(fp,"\tMOV\tLR,R0\n");
 						fprintf(fp,"\tPOP\t{R0}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R0,LR\n");
 					}
 					else{
@@ -1273,10 +1389,12 @@ int traversetree(NODE *node){
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg2].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						fprintf(fp,"\tPUSH\t{R0}\n");
+						changestoffset(8);
 						fprintf(fp,"\tSDIV\tR0,R0,R10\n");
 						fprintf(fp,"\tMUL\tR0,R0,R10\n");
 						fprintf(fp,"\tMOV\tLR,R0\n");
 						fprintf(fp,"\tPOP\t{R0}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R0,LR\n");
 						curvar=destreg2;					
 					}
@@ -1284,20 +1402,24 @@ int traversetree(NODE *node){
 				else if(destreg2==0 && destreg1 < 10){
 					fprintf(fp,"\tPUSH\t{R0}\n");
 					fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
+					changestoffset(8);
 					fprintf(fp,"\tSDIV\tR%d,R%d,R0\n",destreg1,destreg1);
 					fprintf(fp,"\tMUL\tR%d,R%d,R0\n",destreg1,destreg1);
 					fprintf(fp,"\tMOV\tLR,R%d\n",destreg1);
 					fprintf(fp,"\tPOP\t{R%d}\n",destreg1);
+					changestoffset(-4);
 					fprintf(fp,"\tSUB\tR0,R%d,LR\n",destreg1);
 				}
 				else if(destreg2==0){ //destreg1 >= 10
 					if(curvar==destreg1){   //destreg1 is R10,destreg2 is R0
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						fprintf(fp,"\tPUSH\t{R10}\n");
+						changestoffset(8);
 						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
 						fprintf(fp,"\tMUL\tR10,R10,R0\n");
 						fprintf(fp,"\tMOV\tLR,R10\n");
 						fprintf(fp,"\tPOP\t{R10}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 					}
 					else{
@@ -1305,10 +1427,12 @@ int traversetree(NODE *node){
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						fprintf(fp,"\tPUSH\t{R10}\n");
+						changestoffset(8);
 						fprintf(fp,"\tSDIV\tR10,R10,R0\n");
 						fprintf(fp,"\tMUL\tR10,R10,R0\n");
 						fprintf(fp,"\tMOV\tLR,R10\n");
 						fprintf(fp,"\tPOP\t{R10}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 						curvar=destreg1;						
 					}
@@ -1318,10 +1442,12 @@ int traversetree(NODE *node){
 					if(curvar==destreg1){  //destreg 1 is R10,destreg2 is LR
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						fprintf(fp,"\tPUSH\t{R10}\n");
+						changestoffset(8);
 						fprintf(fp,"\tSDIV\tR10,R10,LR\n");
 						fprintf(fp,"\tMUL\tR10,R10,LR\n");
 						fprintf(fp,"\tMOV\tLR,R10\n");
 						fprintf(fp,"\tPOP\t{R10}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 					}
 					else{
@@ -1329,10 +1455,12 @@ int traversetree(NODE *node){
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[destreg1].stoffset);
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						fprintf(fp,"\tPUSH\t{R10}\n");
+						changestoffset(8);
 						fprintf(fp,"\tSDIV\tR10,R10,LR\n");
 						fprintf(fp,"\tMUL\tR10,R10,LR\n");
 						fprintf(fp,"\tMOV\tLR,R10\n");
 						fprintf(fp,"\tPOP\t{R10}\n");
+						changestoffset(-4);
 						fprintf(fp,"\tSUB\tR0,R10,LR\n");
 						curvar=destreg1;						
 					}
@@ -1340,10 +1468,12 @@ int traversetree(NODE *node){
 				else{
 					fprintf(fp,"\tPUSH\t{R0}\n");
 					fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
+					changestoffset(8);
 					fprintf(fp,"\tSDIV\tR0,R%d,R%d\n",destreg1,destreg2);
 					fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
 					fprintf(fp,"\tMOV\tLR,R0\n");
 					fprintf(fp,"\tPOP\t{R0}\n");
+					changestoffset(-4);
 					fprintf(fp,"\tSUB\tR0,R0,LR\n");
 				}
 				return -1;
@@ -1364,6 +1494,7 @@ int traversetree(NODE *node){
 		traversetree(node->left);
 		traversetree(node->right);
 		}
+		
 	}
 	return 0;
 }
@@ -1385,6 +1516,13 @@ int findconstloc(long n){
 	return 0;
 }
 
+void changestoffset(int off){
+int i;
+	for(i=10;i<26;i++){
+	vst[i].stoffset+=off;
+}
+r0stoffset+=off;
+}
 
 
 void yyerror(char * str){
@@ -1392,7 +1530,8 @@ printf("%s\n",str);
 }
 
 void main(){
-stpushcnt = curvar =0;
+r0stoffset =-4;
+curvar = 10;
 execseq = g_ptr_array_new();
 constarr = g_array_new(FALSE,TRUE,sizeof(long));
 int i;
