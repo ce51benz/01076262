@@ -1,6 +1,7 @@
 %{
 #include<stdio.h>
 #include<glib.h>
+#include<math.h>
 void yyerror(char *);
 
 typedef struct _node{
@@ -47,15 +48,15 @@ input:START MAIN NEWLINE stmts END MAIN
 {goto warppt;}|START MAIN NEWLINE stmts END MAIN NEWLINE{
 	warppt:
 	curvar=curvar;
-	int k,vid,destreg;
-	long loc;
+	int vid,destreg;
+	long loc,k;
 	NODE *ptr;
 	fp = fopen("output.s","w");
 	fprintf(fp,".text\n");
 	fprintf(fp,".align 2\n");
 	fprintf(fp,".global _start\n");
 	fprintf(fp,"_start:\n");
-	fprintf(fp,"\tSUB\tSP,SP,#68\n");
+	fprintf(fp,"\tSUB\tSP,SP,#68\n"); //temp storage for LAIR R0,R10(K-Z)
 	for(k=execseq->len-1;k>=0;k--){
 		ptr = g_ptr_array_index(execseq,k);
 		//=======================================================
@@ -74,8 +75,8 @@ input:START MAIN NEWLINE stmts END MAIN
 					g_array_append_val(constarr,n);
 					loc = (constarr->len-1)*4;
 				}
-				fprintf(fp,"\tLDR\tR11,=const\n");
-				fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",loc);
+				fprintf(fp,"\tLDR\tR11,=const%d\n",(loc/256));
+				fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",(loc%256));
 			}
 			else{ //equleft is VAR
 				vid = strtol(equleft->lexame,NULL,10)-1;
@@ -105,8 +106,8 @@ input:START MAIN NEWLINE stmts END MAIN
 					g_array_append_val(constarr,n);
 					loc = (constarr->len-1)*4;
 				}
-				fprintf(fp,"\tLDR\tR12,=const\n");
-				fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",loc);
+				fprintf(fp,"\tLDR\tR12,=const%d\n",(loc/256));
+				fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",(loc%256));
 			}
 			else{ //equright is VAR
 				vid = strtol(equright->lexame,NULL,10)-1;
@@ -149,16 +150,16 @@ input:START MAIN NEWLINE stmts END MAIN
 				g_array_append_val(constarr,n);
 				loc = (constarr->len-1)*4;
 			}
-			fprintf(fp,"\tLDR\tR11,=const\n");
-			fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",loc);
 			
+			fprintf(fp,"\tLDR\tR11,=const%d\n",(loc/256));
+			fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",(loc%256));			
 			n = strtol(equright->lexame,NULL,10);
 			if(!(loc=findconstloc(n)*4)){
 				g_array_append_val(constarr,n);
 				loc = (constarr->len-1)*4;
 			}
-			fprintf(fp,"\tLDR\tR12,=const\n");
-			fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",loc);
+			fprintf(fp,"\tLDR\tR12,=const%d\n",(loc/256));
+			fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",(loc%256));
 			//=========================================
 			fprintf(fp,"loop%d:\n",looplbcnt);
 			fprintf(fp,"\tCMP\tR11,R12\n");
@@ -439,14 +440,33 @@ input:START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"showout:\n");
     	fprintf(fp,"\t.byte\t1\n");
 	if(constarr->len>0){
-		fprintf(fp,"const:\n");
-		fprintf(fp,"\t.word\t");
-		for(k=0;k<constarr->len;k++){
-			fprintf(fp,"%d",g_array_index(constarr,long,k));
-			if(k+1 < constarr->len)
-				fputc(',',fp);
+		long ind=0;
+		long linecnt=0,maxline;
+		maxline = ceil((double)constarr->len/64);
+		while(linecnt < maxline){
+			fprintf(fp,"const%d:\n",linecnt);
+			fprintf(fp,"\t.word\t");
+			
+			if(linecnt+1 < maxline){
+				for(k=0;k<64;k++){
+					fprintf(fp,"%d",g_array_index(constarr,long,ind));
+					if(k+1 < 64)
+						fputc(',',fp);
+					ind++;
+				}
+			}
+			else{
+				int remainder = constarr->len%64;
+				for(k=0;k<remainder;k++){
+					fprintf(fp,"%d",g_array_index(constarr,long,ind));
+					if(k+1 < remainder)
+						fputc(',',fp);
+					ind++;
+				}
+			}
+			fputc('\n',fp);
+			linecnt++;
 		}
-		fputc('\n',fp);
 	}
 	fprintf(fp,"newline:\n");
 	fprintf(fp,"\t.byte\t13,10\n");
@@ -684,7 +704,7 @@ int traversetree(NODE *node){
 	if(node!=NULL){
 		int destreg1,destreg2;
 		long loc,freereg;
-		if(node->ttype==NUMDEC){
+		if(node->ttype==NUMDEC || node->ttype==NUMHEX){
 			long n = strtol(node->lexame,NULL,10);
 			if(!(loc=findconstloc(n)*4)){
 				g_array_append_val(constarr,n);
@@ -692,21 +712,8 @@ int traversetree(NODE *node){
 			}
 				fprintf(fp,"\tPUSH\t{R0}\n");
 				changestoffset(4);
-				fprintf(fp,"\tLDR\tR0,=const\n");
-				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",loc);
-			return -1;
-		}
-		else if(node->ttype==NUMHEX){
-			long n = strtol(node->lexame,NULL,10);
-			if(!(loc=findconstloc(n)*4)){
-				g_array_append_val(constarr,n);
-				loc = (constarr->len-1)*4;
-			}
-				fprintf(fp,"\tPUSH\t{R0}\n");
-				changestoffset(4);
-				fprintf(fp,"\tLDR\tR0,=const\n");
-				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",loc);
-			
+				fprintf(fp,"\tLDR\tR0,=const%d\n",(loc/256));
+				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",(loc%256));
 			return -1;
 		}
 		else if(node->ttype==VAR){
@@ -1484,15 +1491,6 @@ int traversetree(NODE *node){
 					fprintf(fp,"\tSUB\tR0,R0,LR\n");
 				}
 				return -1;
-				//================================================
-				/*fprintf(fp,"\tPUSH\t{R0}\n");
-
-				fprintf(fp,"\tPUSH\t{R%d}\n",destreg1);
-				fprintf(fp,"\tSDIV\tR0,R%d,R%d\n",destreg1,destreg2);
-				fprintf(fp,"\tMUL\tR0,R0,R%d\n",destreg2);
-				fprintf(fp,"\tMOV\tLR,R0\n");
-				fprintf(fp,"\tPOP\t{R0}\n");
-				fprintf(fp,"\tSUB\tR0,R0,LR\n");*/
 			}
 
 		}
@@ -2180,7 +2178,6 @@ vst[0].stoffset+=off;
 
 
 void yyerror(char * str){
-if(strcmp(str,"syntax error")) 
 printf("%s\n",str);
 }
 
