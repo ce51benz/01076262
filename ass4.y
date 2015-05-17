@@ -44,8 +44,8 @@ long iflbcnt,looplbcnt;
 %left '*' '\\' '/'
 %right '~' NEG
 %%
-input:START MAIN NEWLINE stmts END MAIN
-{goto warppt;}|START MAIN NEWLINE stmts END MAIN NEWLINE{
+input:%empty|START MAIN NEWLINE stmts END MAIN
+{goto warppt;}|START MAIN NEWLINE END MAIN|START MAIN NEWLINE END MAIN NEWLINE|START MAIN NEWLINE stmts END MAIN NEWLINE{
 	warppt:
 	curvar=curvar;
 	int vid,destreg;
