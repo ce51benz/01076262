@@ -493,8 +493,8 @@ stdstmt:VAR '=' exp NEWLINE{
 	(n->left)->left = NULL;
 	(n->left)->right = NULL;
 	(n->left)->ttype = VAR;
-	str = g_new(gchar,digitcol($2));
-	sprintf(str,"%d",$2);
+	str = g_new(gchar,digitcol($1));
+	sprintf(str,"%d",$1);
 	(n->left)->lexame = str;
 	$$ = GPOINTER_TO_UINT(n);
 }
@@ -857,7 +857,11 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					//==============================================
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -980,7 +984,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -1103,7 +1110,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -1226,7 +1236,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -1452,7 +1465,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){  //destreg 1 is R10,destreg2 is LR
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						fprintf(fp,"\tPUSH\t{R10}\n");
@@ -1594,7 +1610,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -1717,7 +1736,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -1863,7 +1885,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -1986,7 +2011,10 @@ int traversetree(NODE *node){
 					}
 				}
 				else if(destreg1 >= 10 && destreg2 >= 10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
+					if(curvar==destreg2)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg2].stoffset);
 					if(curvar==destreg1){
 						fprintf(fp,"\tPUSH\t{R0}\n");
 						changestoffset(4);
@@ -2108,7 +2136,11 @@ void generatestdstmt(NODE* ptr){
 					changestoffset(-4);
 				}
 				else if(destreg>=10){
-					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg].stoffset); //LDR value of RXX to LR
+					//check for curvar
+					if(curvar==destreg)
+						fprintf(fp,"\tMOV\tLR,R10\n");
+					else
+						fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",vst[destreg].stoffset); //LDR value of RXX to LR
 					if(vid<10){
 						fprintf(fp,"\tMOV\tR%d,LR\n",vst[vid].regid);
 					}
