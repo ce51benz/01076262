@@ -4,6 +4,7 @@
 #include<math.h>
 void yyerror(char *);
 
+// Node structure
 typedef struct _node{
  	struct _node *left;
 	struct _node *right;
@@ -11,25 +12,27 @@ typedef struct _node{
 	char* lexame;
 }NODE;
 
+// Variable Structure
 typedef struct _varstat{
 	int regid;
 	int stat;
 	int stoffset;
 }VARSTAT;
-int traversetree(NODE *);
-int findconstloc(long);
-void changestoffset(int);
-void generatestdstmt(NODE*);
-GPtrArray *execseq;
+int traversetree(NODE *); 	// Function to traverse Abstract syntax tree
+int findconstloc(long);   	// Function to find location of constant value
+void changestoffset(int); 	// Function to change offset of stack when pop/push a variable
+void generatestdstmt(NODE*);	// Generate general statement assembly
+GPtrArray *execseq;		// Array to store all node
 GArray *constarr;
 FILE *fp;
-VARSTAT vst[26];
-long r0stoffset;
-int curvar,errflag,globalerrflag;
+VARSTAT vst[26];		// Array to show status of a variable $A-$Z
+long r0stoffset;		// Offset of R0 use to calculate when using it
+int curvar,errflag,globalerrflag; // Current Variable , Error Flag , Global error flag
 long iflbcnt,looplbcnt;
 %}
 %define api.value.type{long}
 
+// List of token
 %token START END MAIN NEWLINE
 %token NUMDEC NUMHEX
 %token SHOWBASE10 SHOWBASE16 
@@ -37,6 +40,7 @@ long iflbcnt,looplbcnt;
 %token LOOP TO DO
 %token VAR UNKNOWN
 
+// Operation with priority order
 %left '|'
 %left '&'
 %left SLL SRL
@@ -61,15 +65,15 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 		ptr = g_ptr_array_index(execseq,k);
 		//=======================================================
 		if(ptr->ttype==SHOWBASE10 || ptr->ttype==SHOWBASE16 ||ptr->ttype=='=')
-			generatestdstmt(ptr);
+			generatestdstmt(ptr); // If function is SHOWBASE10 or 16 or operation =,then do a generatestdstmt()
 		//===============================================================
-		else if(ptr->ttype==IF){
+		else if(ptr->ttype==IF){	// "IF" Statement
 			//IF varconst EQUTO varconst THEN NEWLINE stdstmt
 			NODE *equ = ptr->left;
 			NODE *equleft = equ->left;
 			NODE *equright = equ->right;
 			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
-			if(equleft->ttype == NUMDEC || equleft->ttype == NUMHEX){
+			if(equleft->ttype == NUMDEC || equleft->ttype == NUMHEX){ // IF "Constant" EQUTO XX << is number base 10 or 16 
 				long n = strtol(equleft->lexame,NULL,10);
 				if(!(loc=findconstloc(n)*4)){
 					g_array_append_val(constarr,n);
@@ -80,14 +84,14 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 			}
 			else{ //equleft is VAR
 				vid = strtol(equleft->lexame,NULL,10)-1;
-				if(vid<10){
+				if(vid<10){	// Variable $A-$J
 					fprintf(fp,"\tMOV\tR11,R%d\n",vid);
 				}
-				else{
+				else{ // Variable $K-$Z
 					if(curvar==vid){
 						fprintf(fp,"\tMOV\tR11,R10\n");
 					}
-					else{
+					else{ // Get $K-$Z from Stack
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
 						fprintf(fp,"\tMOV\tR11,R10\n");
@@ -100,7 +104,7 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 				}
 			}
 			//===============================================
-			if(equright->ttype == NUMDEC || equright->ttype == NUMHEX){
+			if(equright->ttype == NUMDEC || equright->ttype == NUMHEX){ // IF XX EQUTO "Constant" << is number base 10 or 16 
 				long n = strtol(equright->lexame,NULL,10);
 				if(!(loc=findconstloc(n)*4)){
 					g_array_append_val(constarr,n);
@@ -111,14 +115,14 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 			}
 			else{ //equright is VAR
 				vid = strtol(equright->lexame,NULL,10)-1;
-				if(vid<10){
+				if(vid<10){ // Variable $A-$J
 					fprintf(fp,"\tMOV\tR12,R%d\n",vid);
 				}
 				else{
-					if(curvar==vid){
+					if(curvar==vid){ // Variable $K-$Z
 						fprintf(fp,"\tMOV\tR12,R10\n");
 					}
-					else{
+					else{ // Get $K-$Z from Stack
 						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
 						fprintf(fp,"\tMOV\tR12,R10\n");
@@ -130,42 +134,112 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 					globalerrflag=1;
 				}
 			}
-			
+			// Compare XX EQUTO XX
 			fprintf(fp,"\tCMP\tR11,R12\n");
-			fprintf(fp,"\tBNE\twarpif%d\n",iflbcnt);
-			generatestdstmt(ptr->right);
+			fprintf(fp,"\tBNE\twarpif%d\n",iflbcnt); // Branch if not equal to label warpif
+			generatestdstmt(ptr->right); // Generate Statement
 			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
 			curvar=0;
-			fprintf(fp,"warpif%d:\n",iflbcnt);
-			iflbcnt++;
+			fprintf(fp,"warpif%d:\n",iflbcnt); // Label for BNE to branch to
+			iflbcnt++; // Counter for loop
 		}
+		// Loop statement
 		else{
+			int cmpflag = 0;
 			//LOOP const TO const DO NEWLINE stdstmt
 			NODE *equ = ptr->left;
 			NODE *equleft = equ->left;
 			NODE *equright = equ->right;
 			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
-			long n = strtol(equleft->lexame,NULL,10);
-			if(!(loc=findconstloc(n)*4)){
-				g_array_append_val(constarr,n);
-				loc = (constarr->len-1)*4;
+			if(equleft->ttype == NUMDEC || equleft->ttype == NUMHEX){ // IF "Constant" EQUTO XX << is number base 10 or 16 
+				long n = strtol(equleft->lexame,NULL,10);
+				if(!(loc=findconstloc(n)*4)){
+					g_array_append_val(constarr,n);
+					loc = (constarr->len-1)*4;
+				}
+				fprintf(fp,"\tLDR\tR11,=const%d\n",(loc/256));
+				fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",(loc%256));
 			}
-			
-			fprintf(fp,"\tLDR\tR11,=const%d\n",(loc/256));
-			fprintf(fp,"\tLDR\tR11,[R11,#%d]\n",(loc%256));			
-			n = strtol(equright->lexame,NULL,10);
-			if(!(loc=findconstloc(n)*4)){
-				g_array_append_val(constarr,n);
-				loc = (constarr->len-1)*4;
+			else{ //equleft is VAR
+				vid = strtol(equleft->lexame,NULL,10)-1;
+				if(vid<10){	// Variable $A-$J
+					//fprintf(fp,"\tMOV\tR11,R%d\n",vid);
+				}
+				else{ // Variable $K-$Z
+					if(curvar==vid){
+						//fprintf(fp,"\tMOV\tR11,R10\n");
+					}
+					else{ // Get $K-$Z from Stack
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+						//fprintf(fp,"\tMOV\tR11,R10\n");
+						curvar=vid;					
+					}
+				}
+				if(!vst[vid].stat){
+				printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+				globalerrflag=1;
+				}
+				cmpflag=1;
 			}
-			fprintf(fp,"\tLDR\tR12,=const%d\n",(loc/256));
-			fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",(loc%256));
+			//===============================================
+			if(equright->ttype == NUMDEC || equright->ttype == NUMHEX){ // IF XX EQUTO "Constant" << is number base 10 or 16 
+				long n = strtol(equright->lexame,NULL,10);
+				if(!(loc=findconstloc(n)*4)){
+					g_array_append_val(constarr,n);
+					loc = (constarr->len-1)*4;
+				}
+				fprintf(fp,"\tLDR\tR12,=const%d\n",(loc/256));
+				fprintf(fp,"\tLDR\tR12,[R12,#%d]\n",(loc%256));
+			}
+			else{ //equright is VAR
+				vid = strtol(equright->lexame,NULL,10)-1;
+				if(vid<10){ // Variable $A-$J
+					fprintf(fp,"\tMOV\tR12,R%d\n",vid);
+				}
+				else{
+					if(curvar==vid){ // Variable $K-$Z
+						fprintf(fp,"\tMOV\tR12,R10\n");
+					}
+					else{ // Get $K-$Z from Stack
+						fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);
+						fprintf(fp,"\tLDR\tR10,[SP,#%d]\n",vst[vid].stoffset);
+						fprintf(fp,"\tMOV\tR12,R10\n");
+						curvar=vid;					
+					}
+				}
+				if(!vst[vid].stat){
+					printf("ERROR->Variable $%c is used without assign value.\n",(vid+65));
+					globalerrflag=1;
+				}
+			}
 			//=========================================
 			fprintf(fp,"loop%d:\n",looplbcnt);
-			fprintf(fp,"\tCMP\tR11,R12\n");
-			fprintf(fp,"\tBGT\texitloop%d\n",looplbcnt);
-			generatestdstmt(ptr->right);
-			fprintf(fp,"\tADD\tR11,R11,#1\n");
+			if(cmpflag){
+				int m=strtol(equleft->lexame,NULL,10)-1;
+				if(m<10){
+					fprintf(fp,"\tCMP\tR%d,R12\n",m);
+				}
+				else{
+					fprintf(fp,"\tCMP\tR10,R12\n");
+				}
+			}
+			else
+				fprintf(fp,"\tCMP\tR11,R12\n"); // Compare CONST is CONST
+			fprintf(fp,"\tBGT\texitloop%d\n",looplbcnt); // Branch to exitloop if x > y
+			generatestdstmt(ptr->right); // Generate Statement
+			
+			if(cmpflag){
+				int m = strtol(equleft->lexame,NULL,10)-1;
+				if(m<10){
+					fprintf(fp,"\tADD\tR%d,R%d,#1\n",m,m);
+				}
+				else{
+					fprintf(fp,"\tADD\tR10,R10,#1\n");
+				}
+			}
+			else
+				fprintf(fp,"\tADD\tR11,R11,#1\n");
 			fprintf(fp,"\tSTR\tR10,[SP,#%d]\n",vst[curvar].stoffset);  //*******
 			fprintf(fp,"\tB\tloop%d\n",looplbcnt);
 			fprintf(fp,"exitloop%d:\n",looplbcnt);
@@ -177,7 +251,7 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
     	fprintf(fp,"\tMOV\tR7,#1\n");
     	fprintf(fp,"\tSWI\t0\n");
 	fprintf(fp,"\n\n");
-
+	// Show Base10 Function
 	fprintf(fp,"showbase10:\n");
 	fprintf(fp,"\tPUSH\t{R11}\n");
 	fprintf(fp,"\tPUSH\t{R10}\n");
@@ -302,7 +376,7 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\tB\tsb10printbetz2\n");
 	fprintf(fp,"sb10chknummnchkpt:\n");
 	fprintf(fp,"\tCMP\tR11,#-10\n");
-	fprintf(fp,"\tBGE\tsb10exit3\n");
+	fprintf(fp,"\tBGT\tsb10exit3\n");
 	fprintf(fp,"\tB\tsb10chkpt\n");
 	fprintf(fp,"\n\n");
 	fprintf(fp,"sb10chknumplus:\n");
@@ -328,7 +402,7 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\tB\tsb10printbetz1\n");
 	fprintf(fp,"sb10chknumplchkpt:\n");
 	fprintf(fp,"\tCMP\tR11,#10\n");
-	fprintf(fp,"\tBLE\tsb10exit3\n");
+	fprintf(fp,"\tBLT\tsb10exit3\n");
 	fprintf(fp,"\tB\tsb10chkpt\n");
 	fprintf(fp,"\n\n");
 	fprintf(fp,"sb10exit3:\n");
@@ -355,7 +429,7 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\tPOP\t{R12}\n");
 	fprintf(fp,"\tMOV\tPC,LR\n");	
 	fprintf(fp,"\n\n");
-
+	// Show Base16 Function
 	fprintf(fp,"showbase16:\n");
 	fprintf(fp,"\tPUSH\t{LR}\n");
 	fprintf(fp,"\tPUSH\t{R11}\n");
@@ -421,7 +495,7 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"\tPOP\t{R12}\n");
 	fprintf(fp,"\tMOV\tPC,LR\n");
 
-
+	// Output a num
 	fprintf(fp,"numout:\n");
 	fprintf(fp,"\tCMP\tR10,#9\n");
 	fprintf(fp,"\tBGT\talphaput\n");
@@ -473,7 +547,7 @@ input:%empty|START MAIN NEWLINE stmts END MAIN
 	fprintf(fp,"minussign:\n");
     	fprintf(fp,"\t.byte\t45\n");
 	fclose(fp);
-	//TRY to traverse AST?
+	//TRY to traverse AST? to make a AST
 }|START MAIN NEWLINE stmts error{printf("ERROR->Missing END MAIN\n");}
 |error stmts END MAIN{printf("ERROR->Missing START MAIN\n");};
 stmts:stdstmt stmts{g_ptr_array_add(execseq,GUINT_TO_POINTER($1));}|
@@ -546,7 +620,7 @@ condstmt:IF varconst EQUTO varconst THEN NEWLINE stdstmt{
 	n->right = GUINT_TO_POINTER($7);
 	$$ = GPOINTER_TO_UINT(n);
 };
-loopstmt:LOOP const TO const DO NEWLINE stdstmt{
+loopstmt:LOOP varconst TO varconst DO NEWLINE stdstmt{
 	NODE *n = g_new(NODE,1);
 	n->ttype = LOOP;
 	gchar *str = g_strdup("LOOP");
@@ -699,21 +773,21 @@ exp:varconst{$$=$1;}
 |'{' exp '}'{$$ = $2;}
 ;
 %%
-
+// Traverse AST Function
 int traversetree(NODE *node){
 	if(node!=NULL){
 		int destreg1,destreg2;
 		long loc,freereg;
-		if(node->ttype==NUMDEC || node->ttype==NUMHEX){
+		if(node->ttype==NUMDEC || node->ttype==NUMHEX){ // if node is const
 			long n = strtol(node->lexame,NULL,10);
-			if(!(loc=findconstloc(n)*4)){
+			if(!(loc=findconstloc(n)*4)){ // Find a location
 				g_array_append_val(constarr,n);
 				loc = (constarr->len-1)*4;
 			}
 				fprintf(fp,"\tPUSH\t{R0}\n");
 				changestoffset(4);
-				fprintf(fp,"\tLDR\tR0,=const%d\n",(loc/256));
-				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",(loc%256));
+				fprintf(fp,"\tLDR\tR0,=const%d\n",(loc/256)); // load address of block
+				fprintf(fp,"\tLDR\tR0,[R0,#%d]\n",(loc%256)); // use block+offset address to get
 			return -1;
 		}
 		else if(node->ttype==VAR){
@@ -762,18 +836,18 @@ int traversetree(NODE *node){
 			//ADD R1,R1,R2 => OK
 			destreg1 = traversetree(node->left);
 			destreg2 = traversetree(node->right);
-			if(destreg1==-1 && destreg2==-1){
+			if(destreg1==-1 && destreg2==-1){ // Left and Right is const
 				fprintf(fp,"\tPOP\t{LR}\n");
 				changestoffset(-4);
 				fprintf(fp,"\tADD\tR0,LR,R0\n");
 				return destreg1;
 			}
-			else if(destreg1 == -1){
+			else if(destreg1 == -1){ // Left is const and Right is Variable
 				if(destreg2 == 0){
 					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tADD\tR0,R0,LR\n");
 				}
-				else if(destreg2 >= 10){
+				else if(destreg2 >= 10){ //$K-$Z
 					if(curvar==destreg2){
 						fprintf(fp,"\tADD\tR0,R0,R10\n");
 					}
@@ -789,7 +863,7 @@ int traversetree(NODE *node){
 				return destreg1;
 			}
 			else if(destreg2 == -1){
-				if(destreg1 == 0){
+				if(destreg1 == 0){ // Right is const and Left is Variable
 					fprintf(fp,"\tLDR\tLR,[SP,#%d]\n",r0stoffset);
 					fprintf(fp,"\tADD\tR0,LR,R0\n");
 				}
@@ -811,7 +885,7 @@ int traversetree(NODE *node){
 			else{
 				//since the both side of addition has valid reg to add
 				//we cannot add by accumulate directly(if $B + $C ???)
-				if(destreg1==0 && destreg2==0){
+				if(destreg1==0 && destreg2==0){ // Both is variable
 					fprintf(fp,"\tPUSH\t{R0}\n");
 					changestoffset(4);
 					fprintf(fp,"\tADD\tR0,R0,R0\n");
@@ -1762,10 +1836,10 @@ int traversetree(NODE *node){
 				return -1;
 			}
 		}
-		else if(node->ttype=='~'){
-			destreg1=traversetree(node->right);
+		else if(node->ttype=='~'){ // Not Example ==> ~$A ==> use "Move Not"
+			destreg1=traversetree(node->right); // Right node
 			if(destreg1==-1){
-				fprintf(fp,"\tMVN\tR0,R0\n");
+				fprintf(fp,"\tMVN\tR0,R0\n"); // Const
 				return -1;
 			}
 			if(destreg1>=10){
@@ -2047,6 +2121,7 @@ int traversetree(NODE *node){
 	return 0;
 }
 
+// Generate a simple statment
 void generatestdstmt(NODE* ptr){
 	int vid,destreg;
 	if(ptr->ttype==SHOWBASE10){
@@ -2213,6 +2288,7 @@ void yyerror(char * str){
 printf("%s\n",str);
 }
 
+//The main program
 void main(){
 iflbcnt=looplbcnt=0;
 globalerrflag=0;
